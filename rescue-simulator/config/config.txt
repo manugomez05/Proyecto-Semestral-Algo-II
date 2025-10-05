@@ -1,0 +1,4 @@
+│   ├── default_config.json      # Configuración por defecto
+│   └── strategies/
+│       ├── player1_strategies.py # Estrategias del jugador 1
+│       └── player2_strategies.py # Estrategias del jugador 2

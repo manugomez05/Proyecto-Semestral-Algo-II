@@ -1,0 +1,5 @@
+│   ├── game_engine.py          # Motor del juego
+│   ├── aircraft.py                  # Clases de aeronaves
+│   ├── map_manager.py      # Gestión del mapa
+│   ├── pathfinding.py           # Algoritmos de navegación
+│   └── visualization.py        # Interfaz gráfica
