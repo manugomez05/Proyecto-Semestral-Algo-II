@@ -57,52 +57,63 @@ class MineManager:
         return list(self.mines)
 
     def _overlap(self, a: Mine, b: Mine) -> bool:
-        """Verifica si dos minas se superponen"""
-        ar, ac = a.center
-        br, bc = b.center
-        
-        # Círculo–Círculo: distancia entre centros <= suma de radios
-        if a.type in (MineType.O1, MineType.O2, MineType.G1) and b.type in (MineType.O1, MineType.O2, MineType.G1):
+        """Verifica si dos minas se superponen.
+        - Círculos: disco de radio `radius`.
+        - T1/T2: rectángulos finitos. Para longitud usamos `half_length` si existe,
+          de lo contrario un valor por defecto pequeño (7)."""
+        DEFAULT_BAND_HALF_LENGTH = 7
+
+        def is_circle(m: Mine) -> bool:
+            return m.type in (MineType.O1, MineType.O2, MineType.G1)
+
+        def band_rect(m: Mine) -> tuple[int, int, int, int]:
+            # Devuelve (min_row, max_row, min_col, max_col)
+            r0, c0 = m.center
+            half_w = m.half_width
+            half_len = getattr(m, 'half_length', DEFAULT_BAND_HALF_LENGTH)
+            if m.type is MineType.T1:  # horizontal: alto = 2*half_w+1, largo = 2*half_len+1
+                return (r0 - half_w, r0 + half_w, c0 - half_len, c0 + half_len)
+            if m.type is MineType.T2:  # vertical: alto = 2*half_len+1, ancho = 2*half_w+1
+                return (r0 - half_len, r0 + half_len, c0 - half_w, c0 + half_w)
+            # No banda
+            return (r0, r0, c0, c0)
+
+        def circle_circle_overlap(a: Mine, b: Mine) -> bool:
+            ar, ac = a.center
+            br, bc = b.center
             dr, dc = ar - br, ac - bc
-            return (dr*dr + dc*dc) <= (a.radius + b.radius) * (a.radius + b.radius)
+            rr = a.radius + b.radius
+            return (dr * dr + dc * dc) <= (rr * rr)
 
-        # Círculo–Banda horizontal (T1): verifica si el círculo intersecta la banda
-        if a.type in (MineType.O1, MineType.O2, MineType.G1) and b.type is MineType.T1:
-            # El círculo intersecta la banda si:
-            # 1. La distancia vertical <= radio del círculo
-            # 2. La distancia horizontal <= half_width de la banda
-            return (abs(ar - br) <= a.radius) and (abs(ac - bc) <= b.half_width)
-            
-        if b.type in (MineType.O1, MineType.O2, MineType.G1) and a.type is MineType.T1:
-            return (abs(br - ar) <= b.radius) and (abs(bc - ac) <= a.half_width)
+        def circle_rect_overlap(circle: Mine, rect_owner: Mine) -> bool:
+            # Prueba estándar círculo-rectángulo (por celdas).
+            cr, cc = circle.center
+            rmin, rmax, cmin, cmax = band_rect(rect_owner)
+            # Punto más cercano del rectángulo al centro del círculo
+            nr = cr if rmin <= cr <= rmax else (rmin if cr < rmin else rmax)
+            nc = cc if cmin <= cc <= cmax else (cmin if cc < cmin else cmax)
+            dr, dc = cr - nr, cc - nc
+            return (dr * dr + dc * dc) <= (circle.radius * circle.radius)
 
-        # Círculo–Banda vertical (T2): verifica si el círculo intersecta la banda
-        if a.type in (MineType.O1, MineType.O2, MineType.G1) and b.type is MineType.T2:
-            # El círculo intersecta la banda si:
-            # 1. La distancia horizontal <= radio del círculo  
-            # 2. La distancia vertical <= half_width de la banda
-            return (abs(ac - bc) <= a.radius) and (abs(ar - br) <= b.half_width)
-            
-        if b.type in (MineType.O1, MineType.O2, MineType.G1) and a.type is MineType.T2:
-            return (abs(bc - ac) <= b.radius) and (abs(br - ar) <= a.half_width)
+        def rect_rect_overlap(a_rect: tuple[int, int, int, int], b_rect: tuple[int, int, int, int]) -> bool:
+            a_rmin, a_rmax, a_cmin, a_cmax = a_rect
+            b_rmin, b_rmax, b_cmin, b_cmax = b_rect
+            # Se superponen si hay intersección en ambas dimensiones
+            rows_overlap = not (a_rmax < b_rmin or b_rmax < a_rmin)
+            cols_overlap = not (a_cmax < b_cmin or b_cmax < a_cmin)
+            return rows_overlap and cols_overlap
 
-        # Banda horizontal–Banda horizontal (T1–T1)
-        if a.type is MineType.T1 and b.type is MineType.T1:
-            # Se superponen si las distancias verticales se solapan
-            return abs(ar - br) <= (a.half_width + b.half_width)
+        # Casos
+        if is_circle(a) and is_circle(b):
+            return circle_circle_overlap(a, b)
 
-        # Banda vertical–Banda vertical (T2–T2)
-        if a.type is MineType.T2 and b.type is MineType.T2:
-            # Se superponen si las distancias horizontales se solapan
-            return abs(ac - bc) <= (a.half_width + b.half_width)
+        if is_circle(a) and (b.type in (MineType.T1, MineType.T2)):
+            return circle_rect_overlap(a, b)
+        if is_circle(b) and (a.type in (MineType.T1, MineType.T2)):
+            return circle_rect_overlap(b, a)
 
-        # Banda horizontal–Banda vertical (T1–T2): siempre se cruzan si están en la misma intersección
-        if (a.type is MineType.T1 and b.type is MineType.T2) or (a.type is MineType.T2 and b.type is MineType.T1):
-            # Se cruzan si el centro de una está dentro del rango de la otra
-            if a.type is MineType.T1:  # a es horizontal, b es vertical
-                return (abs(ar - br) <= a.half_width) and (abs(ac - bc) <= b.half_width)
-            else:  # a es vertical, b es horizontal
-                return (abs(ar - br) <= b.half_width) and (abs(ac - bc) <= a.half_width)
+        if (a.type in (MineType.T1, MineType.T2)) and (b.type in (MineType.T1, MineType.T2)):
+            return rect_rect_overlap(band_rect(a), band_rect(b))
 
         return False
 
@@ -179,7 +190,7 @@ class MineManager:
 
 
 # Función para dibujar las minas en la superficie de pygame
-def drawMines(surface, mines: "MinesManager", rows: int, cols: int, cell_size: int, offset_x: int = 0, offset_y: int = 0) -> None:
+def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int, offset_x: int = 0, offset_y: int = 0) -> None:
     try:
         import pygame
     except ImportError:
