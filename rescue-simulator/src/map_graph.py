@@ -1,5 +1,3 @@
-#clase responsable de crear el grafo que va a representar el mapa 2d del simulador, usando la clase node
-
 from src.node import Node
 
 class MapGraph:

@@ -6,7 +6,7 @@ import random
 import pygame 
 import sys
 from mines import *
-from minesmanager import *
+from mines_manager import *
 
 # Configuración de la ventana
 pygame.init()
