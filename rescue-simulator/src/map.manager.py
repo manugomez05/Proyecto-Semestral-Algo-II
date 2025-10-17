@@ -5,7 +5,8 @@ Maneja la visualización del mapa, cuadrícula y minas.
 import random
 import pygame 
 import sys
-from mines import MineManager, MineType, drawMines
+from mines import *
+from minesmanager import *
 
 # Configuración de la ventana
 pygame.init()
