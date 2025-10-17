@@ -145,11 +145,6 @@ class MineManager:
             max_row = rows - 1 - margin
             min_col = half_width + margin
             max_col = cols - 1 - (half_width + margin)
-        else:
-            min_row = 0 + margin
-            max_row = rows - 1 - margin
-            min_col = 0 + margin
-            max_col = cols - 1 - margin
 
         # sanity por si el mapa es muy chico
         min_row = max(0, min_row)
@@ -158,7 +153,7 @@ class MineManager:
         max_col = max(min_col, max_col)
 
         # Intenta encontrar una posición sin superposición
-        for attempt in range(max_attempts):
+        for _ in range(max_attempts):
             row = random.randint(min_row, max_row)
             col = random.randint(min_col, max_col)
             
@@ -169,7 +164,7 @@ class MineManager:
                 center=(row, col),
                 radius=radius,
                 half_width=half_width,
-                period=params.get("period", 0),
+                period=params.get("period", 0),  # 0 para estáticas
                 static=params.get("static", True),
                 active=True,
                 next_activation=params.get("period", 0)
@@ -180,7 +175,9 @@ class MineManager:
                 return self.addMine(type, (row, col))
         
         # Si no se encontró una posición válida, lanza una excepción
-        raise RuntimeError(f"No se pudo encontrar una posición válida para la mina {type} después de {max_attempts} intentos")
+        raise RuntimeError(
+            f"No se pudo encontrar una posición válida para la mina {type} después de {max_attempts} intentos"
+        )
 
     def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0) -> None:
         """Crea múltiples minas aleatorias según especificación"""
