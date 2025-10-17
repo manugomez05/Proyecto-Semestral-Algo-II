@@ -1,4 +1,7 @@
 from src.node import Node
+from mines_manager import MineManager
+from mines import MineType
+from resources import generate_resources
 
 class MapGraph:
     def __init__(self,rows,cols):
@@ -49,10 +52,46 @@ class MapGraph:
             node.state = state
             node.content = content if content else {}
             
-    def generate_random_map(self):
-        """
-        Distribuye minas y recursos aleatoriamente en el mapa,
-        asegurando una distribución balanceada.
-        ¡¡¡¡¡¡ TODAVIA NO ESTA HECHO !!!!!!!
-        """
-        return
+    def generate_map(self):
+        
+        #Gestor de minas
+        self.mine_manager = MineManager()
+
+        #Cantidad de minas por tipo
+        specific_mines = {
+                MineType.O1: 2,
+                MineType.O2: 2,
+                MineType.T1: 2,
+                MineType.T2: 2,
+                MineType.G1: 2
+            }
+        
+        #Generar minas aleatorias
+        self.mine_manager.addRandomSet(self.rows, self.cols, specific_mines, margin=3)
+
+        #Marcar nodos afectados por minas
+        for mine in self.mine_manager.all(): 
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    if mine.contains((r,c), tick=0): #tick inicial
+                        self.set_node_state(r,c, "mine", {"type": mine.type.name})
+        
+        #Obtener posiciones ocupadas por minas
+        occupied_positions = set() #conjunto con elementos únicos 
+        for mine in self.mine_manager.all():
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    if mine.contains((r,c), tick=0):
+                        occupied_positions.add((r,c))
+
+        #Generar recursos evitando minas
+        resources = generate_resources(self.rows, self.cols, occupied_positions)
+        
+        #Marcar nodos con recursos
+        for res in resources:
+            r,c = res.position
+            self.set_node_state(r,c, "resource", {
+                "subtype": res.tipo,
+                "points": res.puntos,
+                "img": res.img_path
+            })
