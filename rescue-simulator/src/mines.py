@@ -21,7 +21,7 @@ MINE_PARAMS: Dict[MineType, Dict[str, int]] = {
     MineType.O2: {"radius": 2, "static": True},
     MineType.T1: {"half_width": 3, "static": True},
     MineType.T2: {"half_width": 2, "static": True},
-    MineType.G1: {"radius": 2, "period": 60, "static": False},
+    MineType.G1: {"radius": 2, "period": 5, "static": False, "time_based": True},  # 5 segundos
 } 
 
 # Tipo para coordenadas de celda (fila, columna)
@@ -46,6 +46,12 @@ class Mine:
         if not self.static and tick >= self.next_activation:
             self.active = not self.active
             self.next_activation = tick + self.period
+
+    def update_time_based(self, elapsed_time: float) -> None:
+        """Actualiza el estado de minas dinámicas según tiempo real (segundos)"""
+        if not self.static and elapsed_time >= self.next_activation:
+            self.active = not self.active
+            self.next_activation = elapsed_time + self.period
 
     def contains(self, cell: Cell, tick: int) -> bool:
         """Verifica si una celda está dentro del área de efecto"""

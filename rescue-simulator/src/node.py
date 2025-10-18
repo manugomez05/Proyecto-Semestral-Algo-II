@@ -1,3 +1,20 @@
+"""
+Módulo: node
+-------------------------------------------------
+Define la clase `Node`, que representa una celda individual 
+del grafo del mapa.
+
+Cada nodo almacena información sobre su posición, estado 
+y contenido (recurso, mina, base, etc).
+
+Responsabilidades:
+- Representar el estado de cada celda del mapa.
+- Almacenar referencias a sus vecinos.
+- Facilitar el uso del grafo para la simulación y visualización.
+"""
+
+
+
 #Este file es para crear nodos en todo el mapa, lo creo en un archivo aparte 
 #porque les puede servir para usarlo en otros archivos, por ejemplo el de pathfinding.py
 

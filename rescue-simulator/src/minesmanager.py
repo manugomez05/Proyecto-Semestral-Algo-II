@@ -5,8 +5,8 @@ Maneja la colección de minas, verificación de superposiciones y generación al
 from __future__ import annotations
 from typing import List
 import random
-from mines import *
-
+from src.mines import *
+from src.map_graph import *
 # Gestor principal de minas del simulador
 class MineManager: 
     def __init__(self) -> None:
@@ -25,8 +25,11 @@ class MineManager:
             period=params.get("period", 0),
             static=params.get("static", True),
             active=True,
-            next_activation=params.get("period", 0)
+            next_activation=0  # Empezar inmediatamente
         )
+        # Agregar atributo time_based si está en los parámetros
+        if params.get("time_based", False):
+            mine.time_based = True
         self.next_id += 1
         self.mines.append(mine)
         return mine 
@@ -39,14 +42,34 @@ class MineManager:
                 return True 
         return False 
 
-    def updateAll(self, tick: int) -> None:
+    def updateAll(self, tick: int, rows: int = 50, cols: int = 50, elapsed_time: float = 0, map_manager=None) -> None:
         """Actualiza todas las minas dinámicas"""
         for m in self.mines:
-            m.update(tick)
+            if not m.static:
+                # Para minas basadas en tiempo (G1), usar tiempo real
+                if hasattr(m, 'time_based') and m.time_based:
+                    print(f"DEBUG: G1 - tiempo: {elapsed_time:.1f}, next_activation: {m.next_activation:.1f}, activa: {m.active}")
+                    if elapsed_time >= m.next_activation:
+                        print(f"DEBUG: G1 activándose en tiempo {elapsed_time:.1f}, estado actual: {m.active}")
+                        # Si es una mina G1 que se está reactivando, moverla a nueva posición
+                        if m.type == MineType.G1 and not m.active:
+                            print(f"DEBUG: Moviendo G1 de {m.center} a nueva posición")
+                            self._moveG1Mine(m, tick, rows, cols, map_manager)
+                        m.update_time_based(elapsed_time)
+                else:
+                    # Para minas basadas en ticks (comportamiento original)
+                    if tick >= m.next_activation:
+                        m.update(tick)
+                    else:
+                        m.update(tick)
 
     def isCellMined(self, cell: Cell, tick: int) -> bool:
         """Verifica si una celda está afectada por alguna mina"""
-        return any(m.contains(cell, tick) for m in self.mines)
+        for m in self.mines:
+            if m.contains(cell, tick):
+                print(f"DEBUG: Celda {cell} está minada por mina {m.type} en posición {m.center}")
+                return True
+        return False
 
     def minesAffecting(self, cell: Cell, tick: int) -> List[Mine]:
         """Obtiene todas las minas que afectan una celda"""
@@ -121,7 +144,80 @@ class MineManager:
         """Verifica si una mina candidata se superpone con alguna existente"""
         return any(self._overlap(candidate, existing) for existing in self.mines)
 
-    def addRandomMine(self, type: MineType, rows: int, cols: int, margin: int = 0, max_attempts: int = 100) -> Mine:
+    def _moveG1Mine(self, mine: Mine, tick: int, rows: int, cols: int, map_manager=None) -> None:
+        """Mueve una mina G1 a una nueva posición aleatoria"""
+        import random
+        
+        # Parámetros de la mina G1
+        radius = mine.radius
+        margin = 2  # Margen de seguridad
+        
+        # Rango seguro para el centro (considerando el radio)
+        min_row = radius + margin
+        max_row = rows - 1 - (radius + margin)
+        min_col = radius + margin
+        max_col = cols - 1 - (radius + margin)
+        
+        # Asegurar que los rangos sean válidos
+        min_row = max(0, min_row)
+        min_col = max(0, min_col)
+        max_row = max(min_row, max_row)
+        max_col = max(min_col, max_col)
+        
+        # Intentar encontrar una nueva posición
+        max_attempts = 100
+        for _ in range(max_attempts):
+            new_row = random.randint(min_row, max_row)
+            new_col = random.randint(min_col, max_col)
+            
+            # Crear mina temporal para verificar superposición
+            temp_mine = Mine(
+                id=mine.id,
+                type=mine.type,
+                center=(new_row, new_col),
+                radius=mine.radius,
+                half_width=mine.half_width,
+                period=mine.period,
+                static=mine.static,
+                active=mine.active,
+                next_activation=mine.next_activation
+            )
+            
+            # Verificar que no se superponga con otras minas (excepto consigo misma)
+            overlaps = False
+            for existing in self.mines:
+                if existing.id != mine.id and self._overlap(temp_mine, existing):
+                    overlaps = True
+                    break
+            
+            # Verificar que no se superponga con recursos
+            if not overlaps:
+                # Verificar que el radio de la mina no afecte recursos
+                safe_position = True
+                if map_manager:
+                    for delta_row in range(-radius, radius + 1):
+                        for delta_col in range(-radius, radius + 1):
+                            check_row = new_row + delta_row
+                            check_col = new_col + delta_col
+                            if 0 <= check_row < rows and 0 <= check_col < cols:
+                                if (delta_row * delta_row + delta_col * delta_col) <= radius * radius:
+                                    # Verificar si esta celda tiene un recurso
+                                    node = map_manager.graph.get_node(check_row, check_col)
+                                    if node.state == 'occupied' and node.content:
+                                        print(f"DEBUG: Posición ({new_row}, {new_col}) no es segura - hay recurso en ({check_row}, {check_col})")
+                                        safe_position = False
+                                        break
+                        if not safe_position:
+                            break
+                
+                if safe_position:
+                    # Mover la mina a la nueva posición
+                    old_pos = mine.center
+                    mine.center = (new_row, new_col)
+                    print(f"DEBUG: G1 movida de {old_pos} a {mine.center}")
+                    break
+
+    def addRandomMine(self, type: MineType, rows: int, cols: int, margin: int = 0, max_attempts: int = 100, map_graph: MapGraph = None) -> Mine:
         """Crea una mina en posición aleatoria sin superposición"""
         params = MINE_PARAMS[type]
         radius = params.get("radius", 0)
@@ -172,18 +268,18 @@ class MineManager:
             
             # Si no se superpone con ninguna mina existente, la agregamos
             if not self._would_overlap_any(temp_mine):
+                if map_graph:
+                    map_graph.set_node_state(row, col, "mine", temp_mine)
                 return self.addMine(type, (row, col))
         
         # Si no se encontró una posición válida, lanza una excepción
-        raise RuntimeError(
-            f"No se pudo encontrar una posición válida para la mina {type} después de {max_attempts} intentos"
-        )
+        raise RuntimeError(f"No se pudo encontrar una posición válida para la mina {type} después de {max_attempts} intentos")
 
-    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0) -> None:
+    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0, map_graph: MapGraph = None) -> None:
         """Crea múltiples minas aleatorias según especificación"""
         for type_, count in spec.items():
             for _ in range(count):
-                self.addRandomMine(type_, rows, cols, margin=margin)
+                self.addRandomMine(type_, rows, cols, margin=margin, map_graph=map_graph)
 
 
 # Función para dibujar las minas en la superficie de pygame
@@ -197,6 +293,7 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
     COLOR_ACTIVE = (220, 80, 80)    # Rojo para minas activas
     COLOR_INACTIVE = (160, 160, 160)  # Gris para minas inactivas
     COLOR_T = (80, 120, 220)        # Azul para bandas T1 y T2
+    COLOR_RADIUS = (255, 255, 0)    # Amarillo para mostrar el radio (TEMPORAL)
 
     # Convierte coordenadas de celda a píxeles considerando los offsets
     def cellToPx(row: int, col: int) -> tuple[int, int]:
@@ -204,6 +301,10 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
 
     # Dibuja cada mina según su tipo
     for mine in mines.all():
+        # Para minas dinámicas (G1), solo dibujar si están activas
+        if not mine.static and not mine.active:
+            continue
+            
         # Determina el color basado en el estado de la mina
         if mine.type in (MineType.T1, MineType.T2):
             color = COLOR_T
@@ -212,7 +313,7 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
             
         mine_row, mine_col = mine.center
 
-        # Dibujo para minas circulares (O1, O2, G1)
+        # Dibujo para minas circulares (O1, O2, G1) - TEMPORAL: mostrar radio completo
         if mine.type in (MineType.O1, MineType.O2, MineType.G1):
             radius = mine.radius
             for delta_row in range(-radius, radius + 1):
@@ -222,45 +323,56 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
                     if 0 <= current_row < rows and 0 <= current_col < cols:
                         if (delta_row * delta_row + delta_col * delta_col) <= radius * radius:
                             x, y = cellToPx(current_row, current_col)
-                            # Dibuja un rectángulo con borde para que se vea la cuadrícula
                             rect = pygame.Rect(x, y, cell_size, cell_size)
-                            pygame.draw.rect(surface, color, rect, 0)
-                            # Dibuja un borde sutil para mantener la cuadrícula visible
+                            
+                            # Centro en rojo, radio en amarillo
+                            if delta_row == 0 and delta_col == 0:
+                                pygame.draw.rect(surface, (255, 0, 0), rect, 0)  # Centro rojo
+                            else:
+                                pygame.draw.rect(surface, COLOR_RADIUS, rect, 0)  # Radio amarillo
+                            
+                            # Dibuja un borde para mantener la cuadrícula visible
                             pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
-        # Dibujo para banda horizontal (T1)
+        # Dibujo para banda horizontal (T1) - TEMPORAL: mostrar línea horizontal
         elif mine.type is MineType.T1:
-            half_width = mine.half_width
             # Limita la extensión horizontal de la banda
             band_length = min(15, cols // 3)  # Máximo 15 celdas o 1/3 del ancho del mapa
             start_col = max(0, mine_col - band_length // 2)
             end_col = min(cols - 1, mine_col + band_length // 2)
             
-            start_row = max(0, mine_row - half_width)
-            end_row = min(rows - 1, mine_row + half_width)
-            for current_row in range(start_row, end_row + 1):
-                for current_col in range(start_col, end_col + 1):
-                    x, y = cellToPx(current_row, current_col)
-                    rect = pygame.Rect(x, y, cell_size, cell_size)
-                    pygame.draw.rect(surface, color, rect, 0)
-                    pygame.draw.rect(surface, (0, 0, 0), rect, 1)
+            # Solo dibuja la línea horizontal (no rectángulo)
+            for current_col in range(start_col, end_col + 1):
+                x, y = cellToPx(mine_row, current_col)
+                rect = pygame.Rect(x, y, cell_size, cell_size)
+                
+                # Centro en rojo, resto en amarillo
+                if current_col == mine_col:
+                    pygame.draw.rect(surface, (255, 0, 0), rect, 0)  # Centro rojo
+                else:
+                    pygame.draw.rect(surface, COLOR_RADIUS, rect, 0)  # Línea amarilla
+                
+                pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
-        # Dibujo para banda vertical (T2)
+        # Dibujo para banda vertical (T2) - TEMPORAL: mostrar línea vertical
         elif mine.type is MineType.T2:
-            half_width = mine.half_width
             # Limita la extensión vertical de la banda
             band_length = min(15, rows // 3)  # Máximo 15 celdas o 1/3 del alto del mapa
             start_row = max(0, mine_row - band_length // 2)
             end_row = min(rows - 1, mine_row + band_length // 2)
             
-            start_col = max(0, mine_col - half_width)
-            end_col = min(cols - 1, mine_col + half_width)
-            for current_col in range(start_col, end_col + 1):
-                for current_row in range(start_row, end_row + 1):
-                    x, y = cellToPx(current_row, current_col)
-                    rect = pygame.Rect(x, y, cell_size, cell_size)
-                    pygame.draw.rect(surface, color, rect, 0)
-                    pygame.draw.rect(surface, (0, 0, 0), rect, 1)
+            # Solo dibuja la línea vertical (no rectángulo)
+            for current_row in range(start_row, end_row + 1):
+                x, y = cellToPx(current_row, mine_col)
+                rect = pygame.Rect(x, y, cell_size, cell_size)
+                
+                # Centro en rojo, resto en amarillo
+                if current_row == mine_row:
+                    pygame.draw.rect(surface, (255, 0, 0), rect, 0)  # Centro rojo
+                else:
+                    pygame.draw.rect(surface, COLOR_RADIUS, rect, 0)  # Línea amarilla
+                
+                pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
     def _overlap(self, a: Mine, b: Mine) -> bool:
         """Verifica si dos minas se superponen"""
@@ -377,10 +489,10 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
         # Si no se encontró una posición válida, lanza una excepción
         raise RuntimeError(f"No se pudo encontrar una posición válida para la mina {type} después de {max_attempts} intentos")
 
-    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0) -> None:
+    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0, map_graph: MapGraph = None) -> None:
         """Crea múltiples minas aleatorias según especificación"""
         for type_, count in spec.items():
             for _ in range(count):
-                self.addRandomMine(type_, rows, cols, margin=margin)
+                self.addRandomMine(type_, rows, cols, margin=margin, map_graph=map_graph)
 
 

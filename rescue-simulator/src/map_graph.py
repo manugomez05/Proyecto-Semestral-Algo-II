@@ -1,3 +1,19 @@
+"""
+Módulo: map_graph
+-------------------------------------------------
+Define la estructura de datos del mapa mediante una cuadrícula de nodos.
+
+Contiene la clase `MapGraph`, que representa el grafo del terreno 
+y permite acceder o modificar el estado de cada celda.
+
+Responsabilidades:
+- Crear y conectar nodos (vecinos adyacentes).
+- Proveer funciones de acceso y modificación de estado.
+- Servir como base de los algoritmos de búsqueda (pathfinding).
+"""
+
+
+
 #clase responsable de crear el grafo que va a representar el mapa 2d del simulador, usando la clase node
 
 from src.node import Node
@@ -18,6 +34,8 @@ class MapGraph:
                 node = Node(row,col)
                 row_nodes.append(node)
             self.grid.append(row_nodes)
+
+
     def connect_neighbors(self):
         """
         Conecta cada nodo con su vecino
