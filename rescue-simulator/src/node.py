@@ -17,7 +17,6 @@ Responsabilidades:
 
 #Este file es para crear nodos en todo el mapa, lo creo en un archivo aparte 
 #porque les puede servir para usarlo en otros archivos, por ejemplo el de pathfinding.py
-
 """
 En el simulador, cada celda de la cuadrícula va a ser un nodo. Cada nodo representa una posición en el mapa y puede tener:
         row: fila en la cuadrícula
@@ -62,10 +61,11 @@ class Node:
         Verifica si el contenido del nodo incluye una persona.
         """
         if self.state == "resource":
-            return self.content.get("subtype") == "person"
+            return self.content.get("subtype") == "person" #se accede al tipo especifico del recurso con subtype
         elif self.state == "vehicle":
             return "person" in self.content.get("cargo", [])
         return False
+    
     def get_position(self):
         """
         Devuelve la posición del nodo como tupla (row, col).
