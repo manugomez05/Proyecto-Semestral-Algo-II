@@ -16,7 +16,7 @@ Responsabilidades:
 import random
 from src.map_graph import MapGraph
 from src.resources import generate_resources
-from src.minesmanager import MineManager
+from src.mines_manager import MineManager
 from src.mines import MineType
 
 class MapManager:
@@ -89,11 +89,25 @@ class MapManager:
 
     def generate_bases(self):
         """Ubica las bases de los dos jugadores en extremos opuestos."""
+        """
+
+        Implementacion vieja
+
         base1 = self.graph.get_node(0, 0)
         base2 = self.graph.get_node(self.rows - 1, self.cols - 1)
         base1.state = "base_p1"
         base2.state = "base_p2"
         self.bases = [base1, base2]
+        """
+
+        """
+        Genera las posiciones iniciales de las bases de ambos jugadores.
+        """
+        self.base_positions = {
+            "player1": self.graph.get_node(0, 0),
+            "player2": self.graph.get_node(self.rows - 1, self.cols - 1)
+        }
+        return self.base_positions
 
     # --------------------------------------------------
     # FUNCIONES DE CONSULTA

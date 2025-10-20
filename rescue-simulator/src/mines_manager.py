@@ -7,6 +7,7 @@ from typing import List
 import random
 from src.mines import *
 from src.map_graph import *
+from src import PALETTE_5, PALETTE_4
 # Gestor principal de minas del simulador
 class MineManager: 
     def __init__(self) -> None:
@@ -48,12 +49,12 @@ class MineManager:
             if not m.static:
                 # Para minas basadas en tiempo (G1), usar tiempo real
                 if hasattr(m, 'time_based') and m.time_based:
-                    print(f"DEBUG: G1 - tiempo: {elapsed_time:.1f}, next_activation: {m.next_activation:.1f}, activa: {m.active}")
+                    #print(f"DEBUG: G1 - tiempo: {elapsed_time:.1f}, next_activation: {m.next_activation:.1f}, activa: {m.active}")
                     if elapsed_time >= m.next_activation:
-                        print(f"DEBUG: G1 activándose en tiempo {elapsed_time:.1f}, estado actual: {m.active}")
+                        #print(f"DEBUG: G1 activándose en tiempo {elapsed_time:.1f}, estado actual: {m.active}")
                         # Si es una mina G1 que se está reactivando, moverla a nueva posición
                         if m.type == MineType.G1 and not m.active:
-                            print(f"DEBUG: Moviendo G1 de {m.center} a nueva posición")
+                            #print(f"DEBUG: Moviendo G1 de {m.center} a nueva posición")
                             self._moveG1Mine(m, tick, rows, cols, map_manager)
                         m.update_time_based(elapsed_time)
                 else:
@@ -67,7 +68,7 @@ class MineManager:
         """Verifica si una celda está afectada por alguna mina"""
         for m in self.mines:
             if m.contains(cell, tick):
-                print(f"DEBUG: Celda {cell} está minada por mina {m.type} en posición {m.center}")
+                #print(f"DEBUG: Celda {cell} está minada por mina {m.type} en posición {m.center}")
                 return True
         return False
 
@@ -204,7 +205,7 @@ class MineManager:
                                     # Verificar si esta celda tiene un recurso
                                     node = map_manager.graph.get_node(check_row, check_col)
                                     if node.state == 'occupied' and node.content:
-                                        print(f"DEBUG: Posición ({new_row}, {new_col}) no es segura - hay recurso en ({check_row}, {check_col})")
+                                        #print(f"DEBUG: Posición ({new_row}, {new_col}) no es segura - hay recurso en ({check_row}, {check_col})")
                                         safe_position = False
                                         break
                         if not safe_position:
@@ -214,7 +215,7 @@ class MineManager:
                     # Mover la mina a la nueva posición
                     old_pos = mine.center
                     mine.center = (new_row, new_col)
-                    print(f"DEBUG: G1 movida de {old_pos} a {mine.center}")
+                    #print(f"DEBUG: G1 movida de {old_pos} a {mine.center}")
                     break
 
     def addRandomMine(self, type: MineType, rows: int, cols: int, margin: int = 0, max_attempts: int = 100, map_graph: MapGraph = None) -> Mine:
@@ -290,10 +291,9 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
         raise RuntimeError("pygame no está disponible para dibujar minas")
 
     # Colores para diferentes estados de las minas
-    COLOR_ACTIVE = (220, 80, 80)    # Rojo para minas activas
+    COLOR_ACTIVE = (170, 150, 150)    # Rojo para minas activas
     COLOR_INACTIVE = (160, 160, 160)  # Gris para minas inactivas
     COLOR_T = (80, 120, 220)        # Azul para bandas T1 y T2
-    COLOR_RADIUS = (255, 255, 0)    # Amarillo para mostrar el radio (TEMPORAL)
 
     # Convierte coordenadas de celda a píxeles considerando los offsets
     def cellToPx(row: int, col: int) -> tuple[int, int]:
@@ -327,9 +327,9 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
                             
                             # Centro en rojo, radio en amarillo
                             if delta_row == 0 and delta_col == 0:
-                                pygame.draw.rect(surface, (255, 0, 0), rect, 0)  # Centro rojo
+                                pygame.draw.rect(surface, (140, 0, 0), rect, 0)  # Centro rojo
                             else:
-                                pygame.draw.rect(surface, COLOR_RADIUS, rect, 0)  # Radio amarillo
+                                pygame.draw.rect(surface, PALETTE_4, rect, 0)  # Radio amarillo
                             
                             # Dibuja un borde para mantener la cuadrícula visible
                             pygame.draw.rect(surface, (0, 0, 0), rect, 1)
@@ -348,9 +348,9 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
                 
                 # Centro en rojo, resto en amarillo
                 if current_col == mine_col:
-                    pygame.draw.rect(surface, (255, 0, 0), rect, 0)  # Centro rojo
+                    pygame.draw.rect(surface, (140, 0, 0), rect, 0)  # Centro rojo
                 else:
-                    pygame.draw.rect(surface, COLOR_RADIUS, rect, 0)  # Línea amarilla
+                    pygame.draw.rect(surface, PALETTE_4, rect, 0)  # Línea amarilla
                 
                 pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
@@ -368,9 +368,9 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
                 
                 # Centro en rojo, resto en amarillo
                 if current_row == mine_row:
-                    pygame.draw.rect(surface, (255, 0, 0), rect, 0)  # Centro rojo
+                    pygame.draw.rect(surface, (140, 0, 0), rect, 0)  # Centro rojo
                 else:
-                    pygame.draw.rect(surface, COLOR_RADIUS, rect, 0)  # Línea amarilla
+                    pygame.draw.rect(surface, PALETTE_4, rect, 0)  # Línea amarilla
                 
                 pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 

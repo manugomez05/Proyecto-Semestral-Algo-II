@@ -16,9 +16,9 @@ Responsabilidades:
 
 #clase responsable de crear el grafo que va a representar el mapa 2d del simulador, usando la clase node
 from src.node import Node
-from mines_manager import MineManager
-from mines import MineType
-from resources import generate_resources
+from src.mines_manager import MineManager
+from src.mines import MineType
+from src.resources import generate_resources
 
 class MapGraph:
     def __init__(self,rows,cols):
@@ -58,6 +58,8 @@ class MapGraph:
                 #Vecino der
                 if col < self.cols - 1:
                     node.add_neighbor(self.grid[row][col + 1])
+
+
     def get_node(self, row, col):
         #Devuelve el nodo en la posicion (row, col)
         if 0 <= row < self.rows and 0 <= col < self.cols:

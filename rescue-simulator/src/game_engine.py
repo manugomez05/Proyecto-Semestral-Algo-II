@@ -13,6 +13,7 @@ Responsabilidades:
 
 
 from src.map_manager import MapManager
+from src.player import Player
 
 import time
 
@@ -23,6 +24,13 @@ class GameEngine:
         self.tick = 0  # Contador de tiempo para minas dinámicas
         self.start_time = time.time()  # Tiempo de inicio para minas basadas en tiempo
 
+        # Generar posiciones
+        base_positions = self.map.generate_bases()
+
+        # Crear jugadores con sus bases
+        self.player1 = Player("Jugador_1", base_positions["player1"])
+        self.player2 = Player("Jugador_2", base_positions["player2"])
+
     def init_game(self):
         print("Inicializando mapa...")
         self.map.clear_map()
@@ -32,6 +40,7 @@ class GameEngine:
     def start_game(self):
         print("Simulación iniciada")
         self.state = "running"
+        
         self.start_time = time.time()  # Reiniciar tiempo al iniciar
 
     def stop_game(self):

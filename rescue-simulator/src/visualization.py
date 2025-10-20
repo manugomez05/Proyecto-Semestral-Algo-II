@@ -14,6 +14,11 @@ Responsabilidades:
 
 import pygame
 import time
+from pathlib import Path
+
+from src import PALETTE_6
+
+
 
 # Definir las constantes directamente para evitar problemas de importación
 BLACK = (22, 33, 60)
@@ -31,13 +36,22 @@ class Visualization:
         self.create_buttons()
 
     def create_buttons(self):
+
+        # 📁 Ruta base del archivo actual (src/visualization.py)
+        base_path = Path(__file__).resolve().parent
+
+        # 📁 Ruta absoluta a la carpeta assets (un nivel arriba de src)
+        assets_path = base_path.parent / 'assets'
+
         from functools import partial
         self.buttons = [
-            Button('paraIntegrar/assets/initBtn.png', 'bottom', (-220,0), partial(self.engine.init_game)),
-            Button('paraIntegrar/assets/playBtn.png', 'bottom', (-50,0), partial(self.engine.start_game)),
-            Button('paraIntegrar/assets/backwardsBtn.png', 'bottom', (80,0)),
-            Button('paraIntegrar/assets/forwardsBtn.png', 'bottom', (170,0)),
-            Button('paraIntegrar/assets/stopBtn.png', 'bottom', (270,0), partial(self.engine.stop_game)),
+
+            Button(str(assets_path / 'initBtn.png'), 'bottom', (-220,0), partial(self.engine.init_game)),
+            Button(str(assets_path / 'playBtn.png'), 'bottom', (-50,0), partial(self.engine.start_game)),
+            Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (80,0)),
+            Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (170,0)),
+            Button(str(assets_path / 'stopBtn.png'), 'bottom', (270,0), partial(self.engine.stop_game)),
+            Button(str(assets_path / 'saveBtn.png'), 'bottomLeft', (40,0), """partial(self.engine.save_game)"""),
         ]
 
     def handle_events(self):
@@ -50,7 +64,8 @@ class Visualization:
     def render(self):
         self.screen.fill(BLACK)
         self.drawMap()
-        self.drawTickInfo()  # Mostrar información del tick
+        #self.drawTickInfo()  # Mostrar información del tick
+
         for b in self.buttons:
             b.draw(self.screen)
         pygame.display.flip()
@@ -59,9 +74,13 @@ class Visualization:
         graph = self.engine.map.graph
         
         # Dibujar las minas con radio completo (TEMPORAL para verificación)
-        from src.minesmanager import drawMines
+        from src.mines_manager import drawMines
         drawMines(self.screen, self.engine.map.mine_manager, graph.rows, graph.cols, CELL_SIZE, 390, 20)
         
+        #Dibuja bases de los jugadores
+        self.engine.player1.drawPlayerBase(self.screen, 49,190)
+        self.engine.player2.drawPlayerBase(self.screen, 1270,190)
+
         # Dibujar recursos y otros elementos
         for row in range(graph.rows):
             for col in range(graph.cols):
@@ -73,13 +92,15 @@ class Visualization:
                     img = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
                     self.screen.blit(img, (x, y))
                 # Ya no dibujamos las minas aquí porque drawMines se encarga
-                pygame.draw.rect(self.screen, (0,0,0), rect, 1)
+                pygame.draw.rect(self.screen, PALETTE_6, rect, 1)
+
+
+
 
     def drawTickInfo(self):
         """Dibuja información del tick y estado de minas dinámicas"""
         try:
-            import pygame
-            font = pygame.font.Font(None, 24)
+            font = pygame.font.Font('Proyecto-Semestral-Algo-II/rescue-simulator/assets/Press_Start_2P/PressStart2P-Regular.ttf', 14)
             
             # Mostrar tick actual y tiempo transcurrido
             elapsed_time = time.time() - self.engine.start_time
@@ -134,5 +155,10 @@ def align(surface, position, offset=(0,0), margin=10):
     if position == "bottom":
         rect.midbottom = screen_rect.midbottom
         rect.y -= margin
+    elif position == "bottomLeft":
+        rect.bottomleft = screen_rect.bottomleft
+        rect.x += margin
+        rect.y -= margin
+    
     rect.move_ip(offset)
     return rect

@@ -1,6 +1,12 @@
 from dataclasses import dataclass, field
 from typing import Tuple, List, Dict
 
+##Falta agregar el atributo collected_value que cada vez que se recoge una carga, suma los puntos
+
+TRUCK_COLOR = (30, 144, 255)
+JEEP_COLOR = (34, 139, 34)
+CAR_COLOR = (240, 240, 240)
+MOTORCYCLE_COLOR = (255, 140, 0)
 
 @dataclass
 class Vehicle:
@@ -21,12 +27,13 @@ class Vehicle:
     type: str
     color: str
     position: Tuple[int, int] = (0, 0)
-    status: str = "idle"
+    status: str = "in_base"
     capacity: int = 0
     allowed_load: List[str] = field(default_factory=lambda: ["people", "cargo"])
     max_consecutive_trips: int = 1
     must_return_on_cargo: bool = False
     trips_done_since_base: int = 0
+    collected_value: int = 0
 
     def move_to(self, row: int, col: int):
         self.position = (row, col)
@@ -35,6 +42,7 @@ class Vehicle:
     def arrive_base(self):
         self.status = "in_base"
         self.trips_done_since_base = 0
+        self.collected_value = 0
 
     def start_trip(self):
         self.status = "moving"
@@ -103,7 +111,7 @@ class VehicleManager:
             v = Vehicle(
                 id=f"jeep_{i}",
                 type="jeep",
-                color="verde",
+                color= JEEP_COLOR,
                 capacity=4,
                 allowed_load=["people", "cargo"],
                 max_consecutive_trips=2,
@@ -116,7 +124,7 @@ class VehicleManager:
             v = Vehicle(
                 id=f"moto_{i}",
                 type="moto",
-                color="negro",
+                color= MOTORCYCLE_COLOR,
                 capacity=1,
                 allowed_load=["people"],
                 max_consecutive_trips=1,
@@ -129,7 +137,7 @@ class VehicleManager:
             v = Vehicle(
                 id=f"camion_{i}",
                 type="camion",
-                color="azul",
+                color= TRUCK_COLOR,
                 capacity=10,
                 allowed_load=["people", "cargo"],
                 max_consecutive_trips=3,
@@ -142,7 +150,7 @@ class VehicleManager:
             v = Vehicle(
                 id=f"auto_{i}",
                 type="auto",
-                color="blanco",
+                color= CAR_COLOR,
                 capacity=4,
                 allowed_load=["people", "cargo"],
                 max_consecutive_trips=1,

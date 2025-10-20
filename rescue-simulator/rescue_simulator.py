@@ -13,8 +13,6 @@ Responsabilidades:
 - Delegar la representación gráfica a (`Visualization`).
 """
 
-## a integrar vehicles.py
-
 import pygame
 from src import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 from src.visualization import Visualization
@@ -35,6 +33,9 @@ def main():
         engine.update()
         view.render()
         pygame.time.Clock().tick(FPS)
+
+        #print(pygame.mouse.get_pos())
+    
 
 if __name__ == "__main__":
     main()

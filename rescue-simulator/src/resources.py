@@ -21,9 +21,8 @@ funcion GenerateResources():
 
 """
 
-
-
 import random
+from pathlib import Path
 
 class Resource:
     def __init__(self, tipo, puntos, img_path, position):
@@ -86,15 +85,25 @@ def generate_resources(map_width, map_height, occupied_positions=set(), mine_man
     resources = []
     used_positions = set(occupied_positions)
 
+    
+
+    # 📁 Ruta base del archivo actual (src/visualization.py)
+    base_path = Path(__file__).resolve().parent
+
+    # 📁 Ruta absoluta a la carpeta assets (un nivel arriba de src)
+    assets_path = base_path.parent / 'assets'
+
+
+
     # Tipos y puntajes
-    persons = [("persona", 50, "paraIntegrar/assets/person.png")] * 10 #crea una lista de tuplas y la repite 10 veces
+    persons = [("persona", 50, str(assets_path / 'person.png'))] * 10 #crea una lista de tuplas y la repite 10 veces
 
     #goods == mercancias 
     goods = [
-        ("ropa", 5, "paraIntegrar/assets/cloth.png"),
-        ("alimentos", 10, "paraIntegrar/assets/food.png"),
-        ("medicamentos", 20, "paraIntegrar/assets/meds.png"),
-        ("armamentos", 50, "paraIntegrar/assets/recurso.png"),
+        ("ropa", 5, str(assets_path / 'cloth.png')),
+        ("alimentos", 10, str(assets_path / 'food.png')),
+        ("medicamentos", 20, str(assets_path / 'meds.png')),
+        ("armamentos", 50, str(assets_path / 'recurso.png')),
     ]
 
     # Generar personas
