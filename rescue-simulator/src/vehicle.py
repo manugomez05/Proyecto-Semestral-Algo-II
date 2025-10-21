@@ -47,13 +47,21 @@ class Vehicle:
     def start_trip(self):
         self.status = "moving"
 
-    def end_trip(self, picked_up: str | None = None):
+    def end_trip(self, picked_up: str | None = None, value: int = 0):
         """Finaliza un viaje; si se recogió algo, actualiza counters y estado.
 
         picked_up: 'people' | 'cargo' | None
         """
         if picked_up:
             self.trips_done_since_base += 1
+            # Si se proporciona un valor (puntos) por lo recogido, lo acumulamos
+            if value and value > 0:
+                self.collected_value += value
+                # Validación: si alcanza o supera la capacidad física del vehículo,
+                # forzamos que deba volver a la base y limitamos el valor al máximo.
+                if self.collected_value >= self.capacity:
+                    self.collected_value = self.capacity
+                    self.status = "need_return"
         # Si alcanza el máximo, forzamos volver a base
         if self.trips_done_since_base >= self.max_consecutive_trips:
             self.status = "need_return"
