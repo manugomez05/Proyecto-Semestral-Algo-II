@@ -87,7 +87,11 @@ class Player:
     
     def drawPlayerBase(self, surface, x, y):
 
-        font = pygame.font.Font('Proyecto-Semestral-Algo-II/rescue-simulator/assets/Press_Start_2P/PressStart2P-Regular.ttf', 14)
+        root_path = Path(__file__).resolve().parents[1]  # sube de src/ a rescue-simulator/
+        font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
+
+        # Crear la fuente con la ruta correcta
+        font = pygame.font.Font(str(font_path), 14)
 
         #Dibujo el nombre del jugador
         name_text = font.render(f"{self.name}", True, PALETTE_1)

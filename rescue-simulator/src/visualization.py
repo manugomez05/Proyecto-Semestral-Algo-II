@@ -92,6 +92,16 @@ class Visualization:
                     img = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
                     self.screen.blit(img, (x, y))
                 # Ya no dibujamos las minas aquí porque drawMines se encarga
+                if node.state == "vehicle" and node.content:
+                    v = node.content
+                    if isinstance(v, dict):
+                        v_type = v.get("type")
+                        color = v.get("color")
+                    else:
+                        v_type = getattr(v, "type", None)
+                        color = getattr(v, "color", None)
+                    pygame.draw.circle(self.screen, color, rect.center, 6)
+
                 pygame.draw.rect(self.screen, PALETTE_6, rect, 1)
 
 

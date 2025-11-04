@@ -73,6 +73,119 @@ class MapGraph:
             node.state = state
             node.content = content if content else {}
             
+
+    def place_vehicle(self, vehicle, row, col) -> bool:
+        """
+        Coloca o mueve un vehículo al nodo (row, col).
+        Limpia la celda anterior del vehículo (si realmente estaba ese vehículo).
+        Devuelve True si se colocó correctamente, False si la posición no existe.
+        """
+        # Determinar posición anterior segura
+        old_pos = None
+        if isinstance(vehicle, dict):
+            old_pos = vehicle.get("position")
+        else:
+            old_pos = getattr(vehicle, "position", None)
+
+        if isinstance(old_pos, (list, tuple)) and len(old_pos) == 2:
+            old_row, old_col = old_pos
+        else:
+            old_row = old_col = None
+
+        # Limpiar nodo anterior solo si corresponde al mismo vehículo.
+        if old_row is not None and 0 <= old_row < self.rows and 0 <= old_col < self.cols:
+            old_node = self.get_node(old_row, old_col)
+            if old_node and old_node.state == "vehicle":
+                content = old_node.content
+                match = False
+                if isinstance(content, dict):
+                    # si node.content es exactamente el dict del vehículo
+                    if content is vehicle:
+                        match = True
+                    else:
+                        # comparar por id si existe
+                        match = content.get("id") == (vehicle.get("id") if isinstance(vehicle, dict) else getattr(vehicle, "id", None))
+                else:
+                    # content puede ser un objeto o una referencia ligera
+                    if hasattr(content, "id"):
+                        match = getattr(content, "id", None) == (vehicle.get("id") if isinstance(vehicle, dict) else getattr(vehicle, "id", None))
+                    elif isinstance(content, dict) and content.get("_obj") is vehicle:
+                        match = True
+                    else:
+                        match = content == vehicle
+
+                if match:
+                    self.set_node_state(old_row, old_col, "empty", {})
+
+        # Obtener destino
+        node = self.get_node(row, col)
+        if node is None:
+            return False
+
+        # Guardar referencia al vehículo (no crear copia) si es dict;
+        # si es objeto, guardar un dict ligero que referencia el objeto para visualización.
+        node.state = "vehicle"
+        if isinstance(vehicle, dict):
+            node.content = vehicle
+        else:
+            node.content = {
+                "_obj": vehicle,
+                "type": getattr(vehicle, "type", None),
+                "id": getattr(vehicle, "id", None),
+                "color": getattr(vehicle, "color", None),
+                "collected_value": getattr(vehicle, "collected_value", None),
+                "position": getattr(vehicle, "position", None)
+            }
+
+        # Actualizar el objeto vehículo (usar move_to si existe)
+        if hasattr(vehicle, "move_to"):
+            vehicle.move_to(row, col)
+        else:
+            if isinstance(vehicle, dict):
+                vehicle["position"] = (row, col)
+                vehicle["status"] = "moving"
+            else:
+                vehicle.position = (row, col)
+                vehicle.status = "moving"
+        return True
+
+    def remove_vehicle(self, vehicle) -> bool:
+        """
+        Quita el vehículo del grafo (si está presente en la posición conocida).
+        """
+        # obtener posición conocida del vehículo
+        if isinstance(vehicle, dict):
+            pos = vehicle.get("position")
+        else:
+            pos = getattr(vehicle, "position", None)
+
+        if not isinstance(pos, (list, tuple)) or len(pos) != 2:
+            return False
+
+        r, c = pos
+        if 0 <= r < self.rows and 0 <= c < self.cols:
+            node = self.get_node(r, c)
+            if node and node.state == "vehicle":
+                content = node.content
+                match = False
+                if isinstance(content, dict):
+                    if content is vehicle:
+                        match = True
+                    else:
+                        match = content.get("id") == (vehicle.get("id") if isinstance(vehicle, dict) else getattr(vehicle, "id", None))
+                else:
+                    if isinstance(content, dict) and content.get("_obj") is vehicle:
+                        match = True
+                    elif hasattr(content, "id"):
+                        match = getattr(content, "id", None) == (vehicle.get("id") if isinstance(vehicle, dict) else getattr(vehicle, "id", None))
+                    else:
+                        match = content == vehicle
+
+                if match:
+                    self.set_node_state(r, c, "empty", {})
+                    return True
+        return False
+
     def generate_map(self):
         
         #Gestor de minas
