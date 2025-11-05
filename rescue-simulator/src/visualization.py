@@ -87,13 +87,14 @@ class Visualization:
                 node = graph.get_node(row, col)
                 x, y = col * CELL_SIZE + 390, row * CELL_SIZE + 20
                 rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
-                if node.state == 'occupied' and node.content:
+                if node.state == 'resource' and node.content:
                     img = pygame.image.load(node.content.img_path).convert_alpha()
                     img = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
                     self.screen.blit(img, (x, y))
                 # Ya no dibujamos las minas aquí porque drawMines se encarga
                 if node.state == "vehicle" and node.content:
                     v = node.content
+                    print(v)
                     if isinstance(v, dict):
                         v_type = v.get("type")
                         color = v.get("color")

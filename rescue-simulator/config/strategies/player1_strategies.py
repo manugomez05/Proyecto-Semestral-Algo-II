@@ -142,7 +142,7 @@ class BasicMoveStrategy:
 #            # QUITAR el break para procesar todos los vehículos
 
         # Nueva versión: mover solo el vehículo con id "moto_1" para debugging
-        target_id = "moto_1"
+        target_id = "jeep_1"
 
         # localizar vehículo por llave o por atributo id
         target_vehicle = None

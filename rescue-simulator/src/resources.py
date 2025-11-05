@@ -96,14 +96,14 @@ def generate_resources(map_width, map_height, occupied_positions=set(), mine_man
 
 
     # Tipos y puntajes
-    persons = [("persona", 50, str(assets_path / 'person.png'))] * 10 #crea una lista de tuplas y la repite 10 veces
+    persons = [("people", 50, str(assets_path / 'person.png'))] * 10 #crea una lista de tuplas y la repite 10 veces
 
     #goods == mercancias 
     goods = [
-        ("ropa", 5, str(assets_path / 'cloth.png')),
-        ("alimentos", 10, str(assets_path / 'food.png')),
-        ("medicamentos", 20, str(assets_path / 'meds.png')),
-        ("armamentos", 50, str(assets_path / 'recurso.png')),
+        ("cargo", 5, str(assets_path / 'cloth.png')),
+        ("cargo", 10, str(assets_path / 'food.png')),
+        ("cargo", 20, str(assets_path / 'meds.png')),
+        ("cargo", 50, str(assets_path / 'recurso.png')),
     ]
 
     # Generar personas

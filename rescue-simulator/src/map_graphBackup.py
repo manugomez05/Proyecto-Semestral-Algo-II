@@ -74,7 +74,7 @@ class MapGraph:
             node.content = content if content else {}
             
 
-    def place_vehicle(self, vehicle, new_row, new_col):
+    def place_vehicle(self, vehicle, row, col) -> bool:
         """
         Coloca o mueve un vehículo al nodo (row, col).
         Limpia la celda anterior del vehículo (si realmente estaba ese vehículo).
@@ -96,72 +96,31 @@ class MapGraph:
         if old_row is not None and 0 <= old_row < self.rows and 0 <= old_col < self.cols:
             old_node = self.get_node(old_row, old_col)
             if old_node and old_node.state == "vehicle":
-                # eliminar sólo si la celda realmente contiene este vehículo (comprobación por id si es dict)
-                try:
-                    content = old_node.content
-                    if isinstance(content, dict):
-                        vid = content.get("id")
-                        if vid and ((isinstance(vehicle, dict) and vehicle.get("id") == vid) or (not isinstance(vehicle, dict) and getattr(vehicle, "id", None) == vid)):
-                            old_node.state = "empty"
-                            old_node.content = {}
+                content = old_node.content
+                match = False
+                if isinstance(content, dict):
+                    # si node.content es exactamente el dict del vehículo
+                    if content is vehicle:
+                        match = True
                     else:
-                        # content puede ser referencia directa al objeto vehicle
-                        if not isinstance(vehicle, dict) and getattr(content, "id", None) == getattr(vehicle, "id", None):
-                            old_node.state = "empty"
-                            old_node.content = {}
-                except Exception:
-                    old_node.state = "empty"
-                    old_node.content = {}
+                        # comparar por id si existe
+                        match = content.get("id") == (vehicle.get("id") if isinstance(vehicle, dict) else getattr(vehicle, "id", None))
+                else:
+                    # content puede ser un objeto o una referencia ligera
+                    if hasattr(content, "id"):
+                        match = getattr(content, "id", None) == (vehicle.get("id") if isinstance(vehicle, dict) else getattr(vehicle, "id", None))
+                    elif isinstance(content, dict) and content.get("_obj") is vehicle:
+                        match = True
+                    else:
+                        match = content == vehicle
+
+                if match:
+                    self.set_node_state(old_row, old_col, "empty", {})
 
         # Obtener destino
-        node = self.get_node(new_row, new_col)
+        node = self.get_node(row, col)
         if node is None:
             return False
-
-        # Si en la celda hay un recurso, intentar recolección
-        resource = node.content if node and node.state == "resource" else None
-        if resource:
-            # Determinar tipo y valor del recurso (soportar dict y objeto)
-            print("Recurso", resource)
-            if isinstance(resource, dict):
-                # soportar claves comunes: 'type' o 'subtype'; puntos en 'points' o 'value'
-                res_type = resource.get("tipo") or resource.get("subtype")
-                res_value = resource.get("puntos", resource.get("value", 1))
-            else:
-                res_type = getattr(resource, "tipo", None)
-                res_value = getattr(resource, "puntos", getattr(resource, "value", 1))
-
-            print("res_type", res_type, "res_value", res_value)
-
-            # Obtener referencia al objeto Vehicle si es posible
-            veh_obj = None
-            if isinstance(vehicle, dict):
-                # si el dict incluye referencia al objeto real bajo clave 'object' o 'obj'
-                veh_obj = vehicle.get("object") or vehicle.get("obj")
-            else:
-                veh_obj = vehicle
-
-            # Intentar que el vehículo recoja el recurso si tenemos el objeto y puede recoger ese tipo
-            if veh_obj and hasattr(veh_obj, "can_pick") and res_type and veh_obj.can_pick(res_type):
-                try:
-                    picked = veh_obj.pick_up(res_type, value=res_value)
-                except Exception:
-                    picked = False
-
-                if picked:
-                    # eliminar recurso del mapa
-                    node.state = "empty"
-                    node.content = {}
-
-                    # si después de recoger no quedan viajes (remaining_trips == 0) o estado exige volver, marcar
-                    try:
-                        if getattr(veh_obj, "remaining_trips", None) and veh_obj.remaining_trips() <= 0:
-                            veh_obj.status = "need_return"
-                        if getattr(veh_obj, "status", None) == "need_return":
-                            # marca que debe volver; la lógica de retorno la maneja GameEngine/estrategias
-                            pass
-                    except Exception:
-                        pass
 
         # Guardar referencia al vehículo (no crear copia) si es dict;
         # si es objeto, guardar un dict ligero que referencia el objeto para visualización.
@@ -169,26 +128,25 @@ class MapGraph:
         if isinstance(vehicle, dict):
             node.content = vehicle
         else:
-            # dict ligero usado por la visualización; mantenemos referencia al objeto bajo 'object'
             node.content = {
-                "id": getattr(vehicle, "id", None),
+                "_obj": vehicle,
                 "type": getattr(vehicle, "type", None),
+                "id": getattr(vehicle, "id", None),
                 "color": getattr(vehicle, "color", None),
-                "position": (new_row, new_col),
-                "object": vehicle
+                "collected_value": getattr(vehicle, "collected_value", None),
+                "position": getattr(vehicle, "position", None)
             }
 
         # Actualizar el objeto vehículo (usar move_to si existe)
         if hasattr(vehicle, "move_to"):
-            try:
-                vehicle.move_to(new_row, new_col)
-            except Exception:
-                vehicle.position = (new_row, new_col)
+            vehicle.move_to(row, col)
         else:
-            # si es dict serializado, actualizar posición en dict
             if isinstance(vehicle, dict):
-                vehicle["position"] = (new_row, new_col)
-
+                vehicle["position"] = (row, col)
+                vehicle["status"] = "moving"
+            else:
+                vehicle.position = (row, col)
+                vehicle.status = "moving"
         return True
 
     def remove_vehicle(self, vehicle) -> bool:

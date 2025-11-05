@@ -53,7 +53,7 @@ class MapManager:
         self.resources = generate_resources(self.cols, self.rows, occupied_positions=occupied, mine_manager=self.mine_manager, tick=0)
         for res in self.resources:
             x, y = res.position
-            self.graph.set_node_state(y, x, "occupied", res)
+            self.graph.set_node_state(y, x, "resource", res)
 
     def generate_mines_with_manager(self):
         """Genera minas usando el MineManager con diferentes tipos"""

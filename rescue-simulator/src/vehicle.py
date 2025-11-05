@@ -72,6 +72,42 @@ class Vehicle:
     def can_pick(self, item_type: str) -> bool:
         return item_type in self.allowed_load
 
+
+    def pick_up(self, item_type: str, value: int = 0) -> bool:
+        """
+        intenta recoger el recurso:
+        - verifica si puede recoger el tipo (people|cargo)
+        - incrementa trips_done_since_base (consume un viaje)
+        - acumula collected_value según value (si no se pasa, suma 1 como fallback)
+        - si alcanza la capacidad física o el número máximo de viajes, marca need_return
+        - si recoge cargo y must_return_on_cargo es True, marca need_return
+        Devuelve True si la recogida fue posible y realizada, False en caso contrario.
+        """
+        if not self.can_pick(item_type):
+            return False
+
+        # consumir un viaje
+        self.trips_done_since_base += 1
+
+        # acumular valor recogido (si no se da 'value', asumimos 1 unidad)
+        added = value if isinstance(value, int) and value > 0 else 1
+        self.collected_value += added
+
+        # no sobrepasar la capacidad física; si se alcanza, forzar regreso
+        if self.capacity is not None and self.collected_value >= self.capacity:
+            self.collected_value = self.capacity
+            self.status = "need_return"
+
+        # si se excede el máximo de viajes consecutivos, forzar regreso
+        if self.trips_done_since_base >= self.max_consecutive_trips:
+            self.status = "need_return"
+
+        # si recogió carga y debe volver en ese caso, marcarlo
+        if item_type == "cargo" and self.must_return_on_cargo:
+            self.status = "need_return"
+
+        return True
+
     def to_dict(self) -> Dict:
         return {
             "id": self.id,
@@ -85,6 +121,10 @@ class Vehicle:
             "must_return_on_cargo": self.must_return_on_cargo,
             "trips_done_since_base": self.trips_done_since_base,
         }
+
+    def remaining_trips(self) -> int:
+        """Devuelve cuántos viajes más puede hacer antes de volver a base."""
+        return max(0, self.max_consecutive_trips - self.trips_done_since_base)
 
 
 class VehicleManager:
