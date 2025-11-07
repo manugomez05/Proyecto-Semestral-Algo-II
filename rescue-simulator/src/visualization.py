@@ -48,8 +48,8 @@ class Visualization:
 
             Button(str(assets_path / 'initBtn.png'), 'bottom', (-220,0), partial(self.engine.init_game)),
             Button(str(assets_path / 'playBtn.png'), 'bottom', (-50,0), partial(self.engine.start_game)),
-            Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (80,0)),
-            Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (170,0)),
+            Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (80,0), partial(self.engine.step_backward)),
+            Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (170,0), partial(self.engine.step_forward)),
             Button(str(assets_path / 'stopBtn.png'), 'bottom', (270,0), partial(self.engine.stop_game)),
             Button(str(assets_path / 'saveBtn.png'), 'bottomLeft', (40,0), """partial(self.engine.save_game)"""),
         ]

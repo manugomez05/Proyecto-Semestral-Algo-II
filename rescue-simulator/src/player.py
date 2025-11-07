@@ -12,6 +12,7 @@ class Player():
 from src import SCREEN_WIDTH, SCREEN_HEIGHT, PALETTE_1
 import pygame
 from pathlib import Path
+import pickle
 from src.vehicle import VehicleManager # suponiendo que estas clases ya existen
 
 class Player:
@@ -81,17 +82,32 @@ class Player:
     # -----------------------------------------------------
     def __repr__(self):
         return f"<Player {self.name} | Score: {self.score} | Vehicles: {len(self.vehicles)}>"
+        
+    def __getstate__(self):
+        """Método especial para pickle"""
+        state = self.__dict__.copy()
+        # Eliminamos la referencia a pygame.font que no es serializable
+        state['_font'] = None
+        return state
+        
+    def __setstate__(self, state):
+        """Método especial para pickle"""
+        self.__dict__.update(state)
+        # Recreamos la fuente al deserializar
+        root_path = Path(__file__).resolve().parents[1]
+        font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
+        self._font = pygame.font.Font(str(font_path), 14)
     
     def get_vehicle(self, vehicle_id):
         return self.vehicles.get(vehicle_id)
     
     def drawPlayerBase(self, surface, x, y):
-
-        root_path = Path(__file__).resolve().parents[1]  # sube de src/ a rescue-simulator/
-        font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
-
-        # Crear la fuente con la ruta correcta
-        font = pygame.font.Font(str(font_path), 14)
+        if not hasattr(self, '_font'):
+            root_path = Path(__file__).resolve().parents[1]  # sube de src/ a rescue-simulator/
+            font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
+            self._font = pygame.font.Font(str(font_path), 14)
+        
+        font = self._font
 
         #Dibujo el nombre del jugador
         name_text = font.render(f"{self.name}", True, PALETTE_1)

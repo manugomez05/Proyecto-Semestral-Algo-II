@@ -25,9 +25,34 @@ class MapGraph:
         self.rows = rows
         self.cols = cols
         self.grid = [] #matriz de nodos
+    def __getstate__(self):
+        """Método especial para pickle"""
+        return self.__dict__.copy()
+        
+    def __setstate__(self, state):
+        """Método especial para pickle"""
+        # Restaurar atributos desde el estado serializado
+        self.__dict__.update(state)
+        # Asegurar que la cuadrícula y vecinos estén consistentes si faltan
+        if not getattr(self, 'grid', None):
+            self.grid = []
+            self.generate_nodes()
+            self.connect_neighbors()
 
-        self.generate_nodes()
-        self.connect_neighbors()
+    def __post_init_setup__(self):
+        """Helper para inicializar la cuadrícula (usado en el constructor)."""
+        # Solo generar nodos si la grid está vacía
+        if not getattr(self, 'grid', None):
+            self.generate_nodes()
+            self.connect_neighbors()
+
+    def __init__(self,rows,cols):
+        # Mantener compatibilidad con la firma original en caso de re-creación
+        self.rows = rows
+        self.cols = cols
+        self.grid = [] #matriz de nodos
+        # Inicializar la cuadrícula y conexiones
+        self.__post_init_setup__()
 
     def generate_nodes(self):
         for row in range(self.rows):

@@ -34,6 +34,14 @@ class MapManager:
         self.resources = []
         self.mine_manager = MineManager()  # Usar el MineManager
         self.bases = []
+        
+    def __getstate__(self):
+        """Método especial para pickle - asegura que el objeto puede ser serializado"""
+        return self.__dict__.copy()
+
+    def __setstate__(self, state):
+        """Método especial para pickle - restaura el objeto al ser deserializado"""
+        self.__dict__.update(state)
 
     # --------------------------------------------------
     # GENERACIÓN DE ELEMENTOS
