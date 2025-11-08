@@ -127,7 +127,7 @@ class MapGraph:
                             recursos.append(content)
         return recursos
 
-    def place_vehicle(self, vehicle, new_row, new_col, tick=None, mine_manager=None):
+    def place_vehicle(self, vehicle, new_row, new_col, tick=None, mine_manager=None, player1=None, player2=None):
         """
         Coloca o mueve un vehículo al nodo (row, col).
         Limpia la celda anterior del vehículo (si realmente estaba ese vehículo).
@@ -140,6 +140,8 @@ class MapGraph:
             new_col: Nueva columna
             tick: Tiempo actual del juego (opcional, necesario para verificar minas dinámicas)
             mine_manager: Gestor de minas (opcional, necesario para verificar minas)
+            player1: Jugador 1 (opcional, para verificar colisiones entre equipos)
+            player2: Jugador 2 (opcional, para verificar colisiones entre equipos)
         """
         # Determinar posición anterior segura
         old_pos = None
@@ -156,28 +158,133 @@ class MapGraph:
         # Limpiar nodo anterior solo si corresponde al mismo vehículo.
         if old_row is not None and 0 <= old_row < self.rows and 0 <= old_col < self.cols:
             old_node = self.get_node(old_row, old_col)
-            if old_node and old_node.state == "vehicle":
-                # eliminar sólo si la celda realmente contiene este vehículo (comprobación por id si es dict)
-                try:
-                    content = old_node.content
-                    if isinstance(content, dict):
-                        vid = content.get("id")
-                        if vid and ((isinstance(vehicle, dict) and vehicle.get("id") == vid) or (not isinstance(vehicle, dict) and getattr(vehicle, "id", None) == vid)):
-                            old_node.state = "empty"
-                            old_node.content = {}
+            if old_node:
+                # Verificar si el nodo contiene este vehículo (puede estar en estado "vehicle" o en una base)
+                should_clear = False
+                original_base_state = None
+                
+                # Guardar el estado original de la base si existe
+                if old_node.state in ("base_p1", "base_p2"):
+                    original_base_state = old_node.state
+                
+                # Verificar si el contenido del nodo corresponde a este vehículo
+                if old_node.content:
+                    try:
+                        content = old_node.content
+                        if isinstance(content, dict):
+                            vid = content.get("id")
+                            if vid and ((isinstance(vehicle, dict) and vehicle.get("id") == vid) or (not isinstance(vehicle, dict) and getattr(vehicle, "id", None) == vid)):
+                                should_clear = True
+                        else:
+                            # content puede ser referencia directa al objeto vehicle
+                            if not isinstance(vehicle, dict) and getattr(content, "id", None) == getattr(vehicle, "id", None):
+                                should_clear = True
+                    except Exception:
+                        should_clear = True
+                
+                # Limpiar el contenido del vehículo, pero preservar el estado de la base
+                if should_clear:
+                    if original_base_state:
+                        # Si estaba en una base, restaurar el estado de la base sin el vehículo
+                        old_node.state = original_base_state
+                        old_node.content = {}
                     else:
-                        # content puede ser referencia directa al objeto vehicle
-                        if not isinstance(vehicle, dict) and getattr(content, "id", None) == getattr(vehicle, "id", None):
-                            old_node.state = "empty"
-                            old_node.content = {}
-                except Exception:
-                    old_node.state = "empty"
-                    old_node.content = {}
+                        # Si no estaba en una base, limpiar completamente
+                        old_node.state = "empty"
+                        old_node.content = {}
 
         # Obtener destino
         node = self.get_node(new_row, new_col)
         if node is None:
             return False
+
+        # Obtener referencia al objeto Vehicle si es posible
+        veh_obj = None
+        if isinstance(vehicle, dict):
+            veh_obj = vehicle.get("object") or vehicle.get("obj")
+        else:
+            veh_obj = vehicle
+        
+        # Obtener ID del vehículo que se está moviendo
+        moving_vehicle_id = None
+        if isinstance(vehicle, dict):
+            moving_vehicle_id = vehicle.get("id")
+        else:
+            moving_vehicle_id = getattr(vehicle, "id", None)
+        
+        # Verificar si hay un vehículo en la posición destino (puede estar en estado "vehicle" o en una base)
+        if (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
+            existing_vehicle_content = node.content
+            existing_vehicle_id = None
+            existing_vehicle_obj = None
+            
+            if isinstance(existing_vehicle_content, dict):
+                existing_vehicle_id = existing_vehicle_content.get("id")
+                existing_vehicle_obj = existing_vehicle_content.get("object")
+            else:
+                existing_vehicle_id = getattr(existing_vehicle_content, "id", None)
+                existing_vehicle_obj = existing_vehicle_content
+            
+            # Si es el mismo vehículo, permitir el movimiento (ya se limpió la posición anterior)
+            if existing_vehicle_id == moving_vehicle_id:
+                pass  # Continuar con el movimiento normal
+            else:
+                # Hay otro vehículo en la posición destino
+                # Verificar si son del mismo equipo
+                same_team = False
+                if player1 and player2:
+                    # Obtener IDs de vehículos de cada equipo
+                    p1_ids = set()
+                    p2_ids = set()
+                    
+                    if hasattr(player1, "vehicles"):
+                        if isinstance(player1.vehicles, dict):
+                            p1_ids = set(player1.vehicles.keys())
+                        else:
+                            p1_ids = {getattr(v, "id", None) for v in player1.vehicles if hasattr(v, "id")}
+                    
+                    if hasattr(player2, "vehicles"):
+                        if isinstance(player2.vehicles, dict):
+                            p2_ids = set(player2.vehicles.keys())
+                        else:
+                            p2_ids = {getattr(v, "id", None) for v in player2.vehicles if hasattr(v, "id")}
+                    
+                    # Verificar si ambos vehículos pertenecen al mismo equipo
+                    moving_in_p1 = moving_vehicle_id in p1_ids
+                    moving_in_p2 = moving_vehicle_id in p2_ids
+                    existing_in_p1 = existing_vehicle_id in p1_ids
+                    existing_in_p2 = existing_vehicle_id in p2_ids
+                    
+                    same_team = (moving_in_p1 and existing_in_p1) or (moving_in_p2 and existing_in_p2)
+                
+                if same_team:
+                    # Vehículos del mismo equipo: no permitir el movimiento, no destruir
+                    return False
+                else:
+                    # Vehículos de equipos diferentes: destruir ambos
+                    if existing_vehicle_obj and hasattr(existing_vehicle_obj, "status"):
+                        existing_vehicle_obj.status = "destroyed"
+                        existing_vehicle_obj.collected_value = 0
+                    
+                    if veh_obj and hasattr(veh_obj, "status"):
+                        veh_obj.status = "destroyed"
+                        veh_obj.collected_value = 0
+                    
+                    # Limpiar el nodo
+                    # Preservar el estado de la base si estaba en una base
+                    if node.state in ("base_p1", "base_p2"):
+                        # Mantener el estado de la base pero limpiar el contenido del vehículo
+                        node.content = {}
+                        return False  # No permitir el movimiento
+                    else:
+                        node.state = "empty"
+                        node.content = {}
+                        return False  # No permitir el movimiento
+        
+        # Guardar el estado original de la base si existe
+        original_base_state = None
+        if node.state in ("base_p1", "base_p2"):
+            original_base_state = node.state
 
         # Si en la celda hay un recurso, intentar recolección
         resource = node.content if node and node.state == "resource" else None
@@ -230,7 +337,15 @@ class MapGraph:
 
         # Guardar referencia al vehículo (no crear copia) si es dict;
         # si es objeto, guardar un dict ligero que referencia el objeto para visualización.
-        node.state = "vehicle"
+        # Preservar el estado de la base si el vehículo está en una base
+        if original_base_state:
+            # Mantener el estado de la base, pero guardar el vehículo en el contenido
+            # El estado ya es base_p1 o base_p2, no lo cambiamos
+            pass  # El estado ya es base_p1 o base_p2, no lo cambiamos
+        else:
+            node.state = "vehicle"
+        
+        # Guardar el vehículo en el contenido (tanto si está en base como si no)
         if isinstance(vehicle, dict):
             node.content = vehicle
         else:

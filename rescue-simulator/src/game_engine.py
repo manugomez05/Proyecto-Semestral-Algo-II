@@ -14,12 +14,21 @@ Responsabilidades:
 
 from src.map_manager import MapManager
 from src.player import Player
-from config.strategies.player1_strategies import BasicMoveStrategy
+from config.strategies.player1_strategies import Strategy1
+import sys
+import importlib.util
 import os
 import pickle
-#from config.strategies.player1_strategies import Player1ResourceStrategy
-#from config.strategies.player1_strategies import NearestResourceStrategy
 import time
+
+# Importar Strategy2 desde player2.strategies.py (nombre con punto requiere importación especial)
+spec = importlib.util.spec_from_file_location(
+    "player2_strategies", 
+    os.path.join(os.path.dirname(__file__), "..", "config", "strategies", "player2.strategies.py")
+)
+player2_strategies_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(player2_strategies_module)
+Strategy2 = player2_strategies_module.Strategy2
 
 class GameEngine:
     def __init__(self):
@@ -46,23 +55,70 @@ class GameEngine:
         self.map.clear_map()
         resources = self.map.generate_random_map()
 
-
-
-        
         self.player1.resources = resources
         self.player2.resources = resources
 
-        # Asignar estrategia de movimiento al player1
-        # BasicMoveStrategy espera (map_width, map_height, map)
+        # Asignar estrategias a los jugadores
         try:
-            #self.player1.strategy = NearestResourceStrategy(self.map.cols, self.map.rows, self.map)
-            #self.player1.strategy = Player1ResourceStrategy(self.map.cols, self.map.rows, self.map)
-            self.player1.strategy = BasicMoveStrategy(self.map.cols, self.map.rows, self.map)
-        except Exception:
-            # Fallback: no strategy asignada si falla la instanciación
+            # Estrategia 1 para player1: motos destruyen camiones, resto usa Greedy
+            self.player1.strategy = Strategy1(self.map.cols, self.map.rows, self.map, self.player2)
+            
+            # Estrategia 2 para player2: Dijkstra para recursos, motos destruyen camiones
+            self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
+        except Exception as e:
+            print(f"Error al asignar estrategias: {e}")
             self.player1.strategy = None
+            self.player2.strategy = None
+
+        # Inicializar vehículos en la base
+        self._initialize_vehicles_at_base()
 
         self.state = "init"
+    
+    def _initialize_vehicles_at_base(self):
+        """
+        Coloca todos los vehículos de ambos jugadores en sus respectivas bases.
+        """
+        # Obtener posiciones de las bases
+        base_positions_p1 = self.map.get_base_positions_set()
+        base_positions_p2 = self.map.get_base_positions_set()
+        
+        # Para player1: usar posiciones de la base izquierda (col < 2)
+        p1_base_cells = [(row, col) for row, col in base_positions_p1 if col < 2]
+        # Para player2: usar posiciones de la base derecha (col >= cols - 2)
+        p2_base_cells = [(row, col) for row, col in base_positions_p2 if col >= self.map.cols - 2]
+        
+        # Colocar vehículos de player1 en su base y asignar posición específica
+        vehicle_index = 0
+        for vehicle_id, vehicle in self.player1.vehicles.items():
+            if vehicle_index < len(p1_base_cells):
+                base_row, base_col = p1_base_cells[vehicle_index]
+                # Asignar posición específica de base al vehículo
+                vehicle.base_position = (base_row, base_col)
+                # Colocar vehículo en la base usando place_vehicle
+                try:
+                    self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
+                except Exception:
+                    # Fallback: actualizar posición directamente
+                    vehicle.position = (base_row, base_col)
+                    vehicle.status = "in_base"
+                vehicle_index += 1
+        
+        # Colocar vehículos de player2 en su base y asignar posición específica
+        vehicle_index = 0
+        for vehicle_id, vehicle in self.player2.vehicles.items():
+            if vehicle_index < len(p2_base_cells):
+                base_row, base_col = p2_base_cells[vehicle_index]
+                # Asignar posición específica de base al vehículo
+                vehicle.base_position = (base_row, base_col)
+                # Colocar vehículo en la base usando place_vehicle
+                try:
+                    self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
+                except Exception:
+                    # Fallback: actualizar posición directamente
+                    vehicle.position = (base_row, base_col)
+                    vehicle.status = "in_base"
+                vehicle_index += 1
 
     def start_game(self):
         print("Simulación iniciada")
@@ -190,13 +246,46 @@ class GameEngine:
 
         resources = self.map.all_resources()
         
+        # Limpiar vehículos destruidos del mapa
+        self._cleanup_destroyed_vehicles()
+        
         # Mover vehículos del jugador 1 usando su estrategia si está presente
-        strategy = getattr(self.player1, "strategy", None)
-        if strategy is not None and callable(getattr(strategy, "update", None)):
+        strategy1 = getattr(self.player1, "strategy", None)
+        if strategy1 is not None and callable(getattr(strategy1, "update", None)):
             try:
-                #print("resources", resources)
-                #strategy.hola()
-                #strategy.update(self.player1, resources, "jeep_1")
-                strategy.update(self.player1)
+                strategy1.update(self.player1)
             except Exception as e:
                 print(f"Error al ejecutar estrategia player1: {e}")
+        
+        # Mover vehículos del jugador 2 usando su estrategia si está presente
+        strategy2 = getattr(self.player2, "strategy", None)
+        if strategy2 is not None and callable(getattr(strategy2, "update", None)):
+            try:
+                strategy2.update(self.player2)
+            except Exception as e:
+                print(f"Error al ejecutar estrategia player2: {e}")
+    
+    def _cleanup_destroyed_vehicles(self):
+        """Limpia los vehículos destruidos del mapa"""
+        for row in range(self.map.rows):
+            for col in range(self.map.cols):
+                node = self.map.graph.get_node(row, col)
+                if node and (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
+                    vehicle_content = node.content
+                    vehicle_obj = None
+                    
+                    if isinstance(vehicle_content, dict):
+                        vehicle_obj = vehicle_content.get("object")
+                    else:
+                        vehicle_obj = vehicle_content
+                    
+                    if vehicle_obj and hasattr(vehicle_obj, "status"):
+                        if vehicle_obj.status == "destroyed":
+                            # Limpiar el nodo
+                            if node.state in ("base_p1", "base_p2"):
+                                # Restaurar estado de base sin vehículo
+                                node.state = node.state
+                                node.content = {}
+                            else:
+                                node.state = "empty"
+                                node.content = {}

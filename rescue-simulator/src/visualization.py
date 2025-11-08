@@ -89,6 +89,7 @@ class Visualization:
                 rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
                 
                 # Dibujar bases con color diferente (gris oscuro/azul oscuro)
+                # Dibujar la base primero para que esté debajo de los vehículos
                 if node.state in ("base_p1", "base_p2"):
                     # Color para las bases: un gris/azul más oscuro que el fondo
                     BASE_COLOR = (30, 40, 60)  # Color oscuro para las bases
@@ -99,15 +100,27 @@ class Visualization:
                     img = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
                     self.screen.blit(img, (x, y))
                 # Ya no dibujamos las minas aquí porque drawMines se encarga
-                if node.state == "vehicle" and node.content:
+                # Dibujar vehículos (pueden estar en estado "vehicle" o en bases con contenido)
+                if (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
                     v = node.content
-                    print(v)
+                    # Obtener el objeto vehículo real para verificar status
+                    vehicle_obj = None
                     if isinstance(v, dict):
+                        vehicle_obj = v.get("object")
                         v_type = v.get("type")
                         color = v.get("color")
                     else:
+                        vehicle_obj = v
                         v_type = getattr(v, "type", None)
                         color = getattr(v, "color", None)
+                    
+                    # Verificar que el vehículo no esté destruido
+                    if vehicle_obj:
+                        status = getattr(vehicle_obj, "status", None)
+                        if status == "destroyed":
+                            continue  # No dibujar vehículos destruidos
+                    
+                    # Dibujar el vehículo
                     pygame.draw.circle(self.screen, color, rect.center, 6)
 
                 pygame.draw.rect(self.screen, PALETTE_6, rect, 1)

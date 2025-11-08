@@ -36,6 +36,8 @@ class Vehicle:
     # Estado usado por las estrategias: ruta planificada y objetivo actual
     route: List[Tuple[int, int]] = field(default_factory=list)
     target: Optional[object] = None
+    # Posición específica en la base (donde sale y debe volver)
+    base_position: Optional[Tuple[int, int]] = None
 
     def move_to(self, row: int, col: int):
         self.position = (row, col)
