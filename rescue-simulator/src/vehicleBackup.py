@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict
+
+##Falta agregar el atributo collected_value que cada vez que se recoge una carga, suma los puntos
 
 TRUCK_COLOR = (30, 144, 255)
 JEEP_COLOR = (34, 139, 34)
@@ -14,8 +16,7 @@ class Vehicle:
     - id: identificador único
     - type: 'jeep' | 'moto' | 'camion' | 'auto'
     - color: descripción del color
--    - position: (row, col)
-+    - position: (col, row)
+    - position: (row, col)
     - status: 'idle'|'moving'|'in_base'|'destroyed'|etc
     - capacity: número entero (personas/carga)
     - allowed_load: lista con tipos permitidos ('people','cargo')
@@ -33,9 +34,6 @@ class Vehicle:
     must_return_on_cargo: bool = False
     trips_done_since_base: int = 0
     collected_value: int = 0
-    # Estado usado por las estrategias: ruta planificada y objetivo actual
-    route: List[Tuple[int, int]] = field(default_factory=list)
-    target: Optional[object] = None
 
     def move_to(self, row: int, col: int):
         self.position = (row, col)

@@ -129,6 +129,22 @@ class MapManager:
         """Devuelve las bases de los jugadores."""
         return self.bases
 
+    def all_resources(self):
+        """
+        Wrapper que devuelve la lista de recursos desde el grafo interno.
+        """
+        if hasattr(self, "graph") and callable(getattr(self.graph, "all_resources", None)):
+            return self.graph.all_resources()
+        if hasattr(self, "map_graph") and callable(getattr(self.map_graph, "all_resources", None)):
+            return self.map_graph.all_resources()
+        # fallback: si MapManager guarda resources directamente
+        if hasattr(self, "resources"):
+            try:
+                return list(self.resources)
+            except Exception:
+                return []
+        return []
+
     # --------------------------------------------------
     # FUNCIONES DE MODIFICACIÓN
     # --------------------------------------------------
