@@ -98,6 +98,34 @@ class MapGraph:
             node.state = state
             node.content = content if content else {}
             
+    def all_resources(self):
+        """
+        Devuelve una lista con los objetos/resources presentes en el mapa.
+        Si la lista original (self.resources) existe, la devuelve (copia).
+        Si no existe, reconstruye una lista a partir del contenido de los nodos.
+        """
+        if hasattr(self, "resources") and self.resources is not None:
+            return list(self.resources)
+
+        recursos = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                node = self.get_node(r, c)
+                if node and getattr(node, "state", None) == "resource":
+                    content = getattr(node, "content", None)
+                    # Si el contenido almacena el objeto original bajo alguna clave:
+                    if isinstance(content, dict) and ("object" in content or "obj" in content):
+                        obj = content.get("object") or content.get("obj")
+                        recursos.append(obj)
+                    else:
+                        # devolver una representación mínima (incluye posición)
+                        if isinstance(content, dict):
+                            item = dict(content)
+                            item.setdefault("position", (r, c))
+                            recursos.append(item)
+                        else:
+                            recursos.append(content)
+        return recursos
 
     def place_vehicle(self, vehicle, new_row, new_col):
         """
@@ -178,9 +206,13 @@ class MapGraph:
                     node.state = "empty"
                     node.content = {}
 
-                    # si después de recoger no quedan viajes (remaining_trips == 0) o estado exige volver, marcar
+                    # si después de recoger no quedan viajes (trips_done_since_base == 0) o estado exige volver, marcar
                     try:
-                        if getattr(veh_obj, "remaining_trips", None) and veh_obj.remaining_trips() <= 0:
+
+                        print("ENTRO")
+                        max_consecutive_trips = getattr(veh_obj, "max_consecutive_trips", None)
+
+                        if getattr(veh_obj, "trips_done_since_base", None) and veh_obj.trips_done_since_base >= max_consecutive_trips:
                             veh_obj.status = "need_return"
                         if getattr(veh_obj, "status", None) == "need_return":
                             # marca que debe volver; la lógica de retorno la maneja GameEngine/estrategias
@@ -288,6 +320,9 @@ class MapGraph:
         #Generar recursos evitando minas
         resources = generate_resources(self.rows, self.cols, occupied_positions)
         
+        # guardar referencia a la lista original de objetos recursos
+        self.resources = resources
+        
         #Marcar nodos con recursos
         for res in resources:
             r,c = res.position
@@ -296,3 +331,7 @@ class MapGraph:
                 "points": res.puntos,
                 "img": res.img_path
             })
+
+
+
+
