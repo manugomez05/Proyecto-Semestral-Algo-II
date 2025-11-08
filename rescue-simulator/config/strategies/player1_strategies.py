@@ -216,10 +216,14 @@ class BasicMoveStrategy:
 
         placed = False
         try:
+            # Obtener tick y mine_manager del mapa para verificación de minas
+            tick = getattr(self.map, "current_tick", None)
+            mine_manager = getattr(self.map, "mine_manager", None)
+            
             if hasattr(self.map, "graph") and callable(getattr(self.map.graph, "place_vehicle", None)):
-                placed = self.map.graph.place_vehicle(v, new_row, new_col)
+                placed = self.map.graph.place_vehicle(v, new_row, new_col, tick=tick, mine_manager=mine_manager)
             elif callable(getattr(self.map, "place_vehicle", None)):
-                placed = self.map.place_vehicle(v, new_row, new_col)
+                placed = self.map.place_vehicle(v, new_row, new_col, tick=tick, mine_manager=mine_manager)
         except Exception:
             placed = False
 

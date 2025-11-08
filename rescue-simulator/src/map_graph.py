@@ -127,11 +127,19 @@ class MapGraph:
                             recursos.append(content)
         return recursos
 
-    def place_vehicle(self, vehicle, new_row, new_col):
+    def place_vehicle(self, vehicle, new_row, new_col, tick=None, mine_manager=None):
         """
         Coloca o mueve un vehículo al nodo (row, col).
         Limpia la celda anterior del vehículo (si realmente estaba ese vehículo).
+        Verifica si la nueva posición está minada y destruye el vehículo si es así.
         Devuelve True si se colocó correctamente, False si la posición no existe.
+        
+        Args:
+            vehicle: Objeto o dict del vehículo
+            new_row: Nueva fila
+            new_col: Nueva columna
+            tick: Tiempo actual del juego (opcional, necesario para verificar minas dinámicas)
+            mine_manager: Gestor de minas (opcional, necesario para verificar minas)
         """
         # Determinar posición anterior segura
         old_pos = None
@@ -245,6 +253,28 @@ class MapGraph:
             # si es dict serializado, actualizar posición en dict
             if isinstance(vehicle, dict):
                 vehicle["position"] = (new_row, new_col)
+
+        # Verificar si la nueva posición está minada (PASO 3 del flujo)
+        if tick is not None and mine_manager is not None:
+            # Obtener referencia al objeto Vehicle si es posible
+            veh_obj = None
+            if isinstance(vehicle, dict):
+                veh_obj = vehicle.get("object") or vehicle.get("obj")
+            else:
+                veh_obj = vehicle
+            
+            # Solo verificar si el vehículo no está ya destruido
+            if veh_obj and hasattr(veh_obj, "status") and veh_obj.status != "destroyed":
+                # Verificar si la celda está minada
+                if mine_manager.isCellMined((new_row, new_col), tick):
+                    # Vehículo explota: destruir y perder recursos
+                    veh_obj.status = "destroyed"
+                    veh_obj.collected_value = 0
+                    # Limpiar el nodo donde estaba el vehículo
+                    node.state = "empty"
+                    node.content = {}
+                    print(f"¡Vehículo {getattr(veh_obj, 'id', 'unknown')} explotó en mina en posición ({new_row}, {new_col})!")
+                    return True  # Retornamos True porque técnicamente se "colocó" (aunque explotó)
 
         return True
 

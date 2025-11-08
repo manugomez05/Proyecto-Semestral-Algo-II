@@ -34,6 +34,7 @@ class MapManager:
         self.resources = []
         self.mine_manager = MineManager()  # Usar el MineManager
         self.bases = []
+        self.current_tick = 0  # Tick actual para verificación de minas
         
     def __getstate__(self):
         """Método especial para pickle - asegura que el objeto puede ser serializado"""
@@ -163,3 +164,4 @@ class MapManager:
         self.resources.clear()
         self.mine_manager = MineManager()  # Reiniciar el MineManager
         self.bases.clear()
+        self.current_tick = 0  # Reiniciar el tick

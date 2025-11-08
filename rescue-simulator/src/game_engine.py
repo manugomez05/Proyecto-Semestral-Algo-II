@@ -118,6 +118,8 @@ class GameEngine:
             self.player1 = state['player1']
             self.player2 = state['player2']
             self.map = state['map']
+            # Actualizar el tick en el mapa después de cargar
+            self.map.current_tick = self.tick
             print(f"Estado cargado desde {filename}")
             return True
         except (EOFError, pickle.UnpicklingError) as e:
@@ -172,6 +174,9 @@ class GameEngine:
 
         # Incrementar el contador de tiempo (tick)
         self.tick += 1
+        
+        # Actualizar el tick en el mapa para que las estrategias puedan accederlo
+        self.map.current_tick = self.tick
 
         # Calcular tiempo transcurrido en segundos respecto a start_time
         current_time = time.time()
