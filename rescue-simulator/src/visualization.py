@@ -87,6 +87,13 @@ class Visualization:
                 node = graph.get_node(row, col)
                 x, y = col * CELL_SIZE + 390, row * CELL_SIZE + 20
                 rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
+                
+                # Dibujar bases con color diferente (gris oscuro/azul oscuro)
+                if node.state in ("base_p1", "base_p2"):
+                    # Color para las bases: un gris/azul más oscuro que el fondo
+                    BASE_COLOR = (30, 40, 60)  # Color oscuro para las bases
+                    pygame.draw.rect(self.screen, BASE_COLOR, rect, 0)  # Relleno sólido
+                
                 if node.state == 'resource' and node.content:
                     img = pygame.image.load(node.content.img_path).convert_alpha()
                     img = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
