@@ -268,27 +268,14 @@ class MapGraph:
                     
                     if same_team:
                         # Vehículos del mismo equipo: no permitir el movimiento, no destruir
+                        # print(f"⚠️ Colisión mismo equipo detectada: {moving_vehicle_id} intenta moverse a posición ocupada por {existing_vehicle_id}")
                         return False
                     else:
-                        # Vehículos de equipos diferentes: destruir ambos
-                        if existing_vehicle_obj and hasattr(existing_vehicle_obj, "status"):
-                            existing_vehicle_obj.status = "destroyed"
-                            existing_vehicle_obj.collected_value = 0
-                        
-                        if veh_obj and hasattr(veh_obj, "status"):
-                            veh_obj.status = "destroyed"
-                            veh_obj.collected_value = 0
-                        
-                        # Limpiar el nodo
-                        # Preservar el estado de la base si estaba en una base
-                        if node.state in ("base_p1", "base_p2"):
-                            # Mantener el estado de la base pero limpiar el contenido del vehículo
-                            node.content = {}
-                            return False  # No permitir el movimiento
-                        else:
-                            node.state = "empty"
-                            node.content = {}
-                            return False  # No permitir el movimiento
+                        # Vehículos de equipos diferentes: NO destruir aquí, permitir que _check_vehicle_collisions lo maneje
+                        # Esto evita destruir vehículos prematuramente cuando ambos se están moviendo simultáneamente
+                        # print(f"💥 Colisión entre equipos detectada en place_vehicle: {moving_vehicle_id} vs {existing_vehicle_id} en ({new_row}, {new_col})")
+                        # No permitir el movimiento - el vehículo se quedará en su posición anterior
+                        return False
         
         # Guardar el estado original de la base si existe
         original_base_state = None

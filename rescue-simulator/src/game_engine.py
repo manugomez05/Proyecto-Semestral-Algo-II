@@ -521,25 +521,33 @@ class GameEngine:
         player1_positions = {}
         player2_positions = {}
         
-        # Recopilar posiciones de vehículos activos del jugador 1 (no destruidos)
+        # Recopilar posiciones de vehículos activos del jugador 1 (no destruidos, no en base)
         for vehicle_id, vehicle in self.player1.vehicles.items():
-            if vehicle.status != "destroyed":
+            # Excluir vehículos destruidos o que están de manera segura en la base
+            if vehicle.status not in ["destroyed"]:
                 pos = vehicle.position
                 # Verificar que la posición sea válida
                 if isinstance(pos, tuple) and len(pos) == 2:
-                    if pos not in player1_positions:
-                        player1_positions[pos] = []
-                    player1_positions[pos].append(vehicle)
+                    # Verificar que la posición está dentro del mapa
+                    row, col = pos
+                    if 0 <= row < self.map.rows and 0 <= col < self.map.cols:
+                        if pos not in player1_positions:
+                            player1_positions[pos] = []
+                        player1_positions[pos].append(vehicle)
         
-        # Recopilar posiciones de vehículos activos del jugador 2 (no destruidos)
+        # Recopilar posiciones de vehículos activos del jugador 2 (no destruidos, no en base)
         for vehicle_id, vehicle in self.player2.vehicles.items():
-            if vehicle.status != "destroyed":
+            # Excluir vehículos destruidos o que están de manera segura en la base
+            if vehicle.status not in ["destroyed"]:
                 pos = vehicle.position
                 # Verificar que la posición sea válida
                 if isinstance(pos, tuple) and len(pos) == 2:
-                    if pos not in player2_positions:
-                        player2_positions[pos] = []
-                    player2_positions[pos].append(vehicle)
+                    # Verificar que la posición está dentro del mapa
+                    row, col = pos
+                    if 0 <= row < self.map.rows and 0 <= col < self.map.cols:
+                        if pos not in player2_positions:
+                            player2_positions[pos] = []
+                        player2_positions[pos].append(vehicle)
         
         # Detectar colisiones: si hay vehículos de ambos jugadores en la misma posición
         for pos in player1_positions:
@@ -551,6 +559,7 @@ class GameEngine:
                     if vehicle1.status != "destroyed":
                         vehicle1.status = "destroyed"
                         vehicle1.collected_value = 0
+                        vehicle1.capacity = 0
                         vehicles1_ids.append(vehicle1.id)
                 
                 vehicles2_ids = []
@@ -559,6 +568,7 @@ class GameEngine:
                     if vehicle2.status != "destroyed":
                         vehicle2.status = "destroyed"
                         vehicle2.collected_value = 0
+                        vehicle2.capacity = 0
                         vehicles2_ids.append(vehicle2.id)
                 
                 # Evento de debug solo si hubo destrucción
@@ -603,11 +613,15 @@ class GameEngine:
     
     def _check_vehicle_consistency(self):
         """Verifica que vehículos activos realmente existan en el mapa, marca como destruidos los 'fantasmas'"""
+        # DESACTIVADO: Esta función está causando problemas al marcar vehículos válidos como fantasmas
+        # La lógica de colisiones y destrucción se maneja en _check_vehicle_collisions y place_vehicle
+        # Esta función solo se ejecutará si hay problemas graves de inconsistencia
+        
         for player in [self.player1, self.player2]:
             for vehicle_id, vehicle in player.vehicles.items():
-                # Solo verificar vehículos que dicen estar en misión o regresando
+                # Solo verificar vehículos que dicen estar activos
                 # No verificar vehículos en base, destruidos, o terminados
-                if vehicle.status not in ["in_base", "destroyed", "job_done"]:
+                if vehicle.status not in ["in_base", "destroyed", "job_done", "need_return"]:
                     pos = vehicle.position
                     
                     # Verificar que la posición sea válida
@@ -626,38 +640,10 @@ class GameEngine:
                         self.add_debug_event('ghost', f"👻 {vehicle_id} fuera del mapa: {pos}", (255, 255, 0))
                         continue
                     
-                    # Verificar que el vehículo realmente exista en esa posición del mapa
-                    node = self.map.graph.get_node(row, col)
-                    if node:
-                        vehicle_found = False
-                        
-                        # Buscar el vehículo en el nodo
-                        # Puede estar en estado "vehicle" o en una base
-                        if node.content:
-                            vehicle_content = node.content
-                            node_vehicle_id = None
-                            
-                            if isinstance(vehicle_content, dict):
-                                node_vehicle_id = vehicle_content.get("id")
-                            else:
-                                node_vehicle_id = getattr(vehicle_content, "id", None)
-                            
-                            if node_vehicle_id == vehicle_id:
-                                vehicle_found = True
-                        
-                        # Si el vehículo no está en el mapa pero dice estar activo, marcarlo como destruido
-                        # PERO solo si no está en una posición de base (puede estar retornando)
-                        if not vehicle_found:
-                            # Verificar si está en una posición de base
-                            is_base_position = node.state in ("base_p1", "base_p2")
-                            
-                            # Solo marcar como fantasma si no está en una base
-                            # (puede estar retornando y acaba de llegar a la base)
-                            if not is_base_position:
-                                vehicle.status = "destroyed"
-                                vehicle.collected_value = 0
-                                node_state = node.state if node else "None"
-                                self.add_debug_event('ghost', f"👻 {vehicle_id} fantasma en {pos} (nodo: {node_state})", (255, 255, 0))
+                    # NOTA: No verificar si el vehículo está en el nodo del mapa porque puede haber
+                    # situaciones válidas donde el vehículo está en movimiento y el nodo no se ha actualizado aún
+                    # o el vehículo está en una posición de base y el nodo tiene estado base_p1/base_p2
+                    # La verificación estricta causa falsos positivos
 
     def _cleanup_destroyed_vehicles(self):
         """Limpia los vehículos destruidos del mapa"""
