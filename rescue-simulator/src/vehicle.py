@@ -265,31 +265,6 @@ class VehicleManager:
     def all_vehicles(self) -> Dict[str, Vehicle]:
         return dict(self.vehicles)
 
-    def check_vehicle_collision(self) -> List[Tuple[str, str]]:
-        collisions = [] #Lista que guarda las colisiones
-        active_vehicles = {
-            vehicle_id: vehicle for vehicle_id, vehicle in self.vehicles.items()
-            if vehicle.status not in ["in_base", "destroyed"]
-        }
-
-        checked_pairs = set()
-
-        for vehicle_id_1, vehicle_1 in active_vehicles.items():
-            for vehicle_id_2, vehicle_2 in active_vehicles.items():
-                if vehicle_id_1 == vehicle_id_2:
-                    continue  # No comparar un vehículo consigo mismo
-                pair = tuple(sorted([vehicle_id_1, vehicle_id_2]))
-                if pair in checked_pairs:
-                    continue # Ya revisamos este par
-                if vehicle_1.position == vehicle_2.position:
-                    # Colisión detectada
-                    vehicle_1.status = "destroyed"
-                    vehicle_2.status = "destroyed"
-                    vehicle_1.collected_value = 0
-                    vehicle_2.collected_value = 0
-                    collisions.append(pair)
-                    checked_pairs.add(pair)
-        return collisions
 
 
 # from src.vehicle import VehicleManager

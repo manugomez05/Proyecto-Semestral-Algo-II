@@ -269,9 +269,6 @@ class GameEngine:
 
         resources = self.map.all_resources()
         
-        # Limpiar vehículos destruidos del mapa
-        self._cleanup_destroyed_vehicles()
-        
         # Mover vehículos del jugador 1 usando su estrategia si está presente
         strategy1 = getattr(self.player1, "strategy", None)
         if strategy1 is not None and callable(getattr(strategy1, "update", None)):
@@ -287,6 +284,12 @@ class GameEngine:
                 strategy2.update(self.player2)
             except Exception as e:
                 print(f"Error al ejecutar estrategia player2: {e}")
+        
+        # Verificar colisiones entre vehículos de equipos distintos
+        self._check_vehicle_collisions()
+        
+        # Limpiar vehículos destruidos del mapa
+        self._cleanup_destroyed_vehicles()
     
     def _check_vehicles_on_mines(self):
         """Verifica si algún vehículo está en una posición minada y lo destruye"""
@@ -308,6 +311,42 @@ class GameEngine:
                             vehicle_id = getattr(vehicle_obj, "id", "unknown")
                             vehicle_obj.status = "destroyed"
                             vehicle_obj.collected_value = 0
+
+    def _check_vehicle_collisions(self):
+        """Detecta y procesa colisiones entre vehículos de equipos distintos"""
+        # Crear diccionario de posiciones -> vehículos activos para cada jugador
+        player1_positions = {}
+        player2_positions = {}
+        
+        # Recopilar posiciones de vehículos activos del jugador 1
+        for vehicle_id, vehicle in self.player1.vehicles.items():
+            if vehicle.status not in ["in_base", "destroyed"]:
+                pos = vehicle.position
+                if pos not in player1_positions:
+                    player1_positions[pos] = []
+                player1_positions[pos].append(vehicle)
+        
+        # Recopilar posiciones de vehículos activos del jugador 2
+        for vehicle_id, vehicle in self.player2.vehicles.items():
+            if vehicle.status not in ["in_base", "destroyed"]:
+                pos = vehicle.position
+                if pos not in player2_positions:
+                    player2_positions[pos] = []
+                player2_positions[pos].append(vehicle)
+        
+        # Detectar colisiones: si hay vehículos de ambos jugadores en la misma posición
+        for pos in player1_positions:
+            if pos in player2_positions:
+                # Hay colisión en esta posición
+                for vehicle1 in player1_positions[pos]:
+                    vehicle1.status = "destroyed"
+                    vehicle1.collected_value = 0
+                    print(f"Colisión: {vehicle1.id} del {self.player1.name} destruido en {pos}")
+                
+                for vehicle2 in player2_positions[pos]:
+                    vehicle2.status = "destroyed"
+                    vehicle2.collected_value = 0
+                    print(f"Colisión: {vehicle2.id} del {self.player2.name} destruido en {pos}")
 
     def _cleanup_destroyed_vehicles(self):
         """Limpia los vehículos destruidos del mapa"""

@@ -732,12 +732,15 @@ class Strategy2:
                         # VA A LLEGAR a la base este turno: mover y luego entregar en el siguiente tick
                         pass  # Permitir el movimiento
             
+            # Actualizar el estado actual por si cambió durante el procesamiento anterior
+            vehicle_status = getattr(vehicle, "status", None)
+            
             # Si el vehículo está en la base y se va a mover, cambiar estado a "moving"
-            if getattr(vehicle, "status", None) == "in_base" and (new_row, new_col) != current_pos:
+            if vehicle_status == "in_base" and (new_row, new_col) != current_pos:
                 vehicle.status = "moving"
+                vehicle_status = "moving"  # Actualizar la variable local también
             
             # Solo mover si el vehículo no está destruido, la posición cambió y no está en estados terminales
-            vehicle_status = getattr(vehicle, "status", None)
             if (vehicle_status not in ("destroyed", "job_done") and 
                 (new_row, new_col) != current_pos):
                 try:
