@@ -63,9 +63,8 @@ class GameEngine:
             # Estrategia 1 para player1: motos destruyen camiones, resto usa BFS
             self.player1.strategy = Strategy1(self.map.cols, self.map.rows, self.map, self.player2)
             
-            # Estrategia 2 para player2: DESHABILITADA temporalmente
-            # self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
-            self.player2.strategy = None
+            # Estrategia 2 para player2: usa Dijkstra
+            self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
         except Exception as e:
             print(f"Error al asignar estrategias: {e}")
             self.player1.strategy = None
@@ -282,13 +281,12 @@ class GameEngine:
                 print(f"Error al ejecutar estrategia player1: {e}")
         
         # Mover vehículos del jugador 2 usando su estrategia si está presente
-        # DESHABILITADO temporalmente
-        # strategy2 = getattr(self.player2, "strategy", None)
-        # if strategy2 is not None and callable(getattr(strategy2, "update", None)):
-        #     try:
-        #         strategy2.update(self.player2)
-        #     except Exception as e:
-        #         print(f"Error al ejecutar estrategia player2: {e}")
+        strategy2 = getattr(self.player2, "strategy", None)
+        if strategy2 is not None and callable(getattr(strategy2, "update", None)):
+            try:
+                strategy2.update(self.player2)
+            except Exception as e:
+                print(f"Error al ejecutar estrategia player2: {e}")
     
     def _check_vehicles_on_mines(self):
         """Verifica si algún vehículo está en una posición minada y lo destruye"""

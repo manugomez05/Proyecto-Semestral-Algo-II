@@ -32,8 +32,34 @@ class Visualization:
         self.screen = screen
         self.engine = engine
         self.buttons = []
+        # Cache de imágenes para evitar cargar desde disco en cada frame
+        self.image_cache = {}
         #self.font = pygame.font.Font('paraIntegrar/assets/PressStart2P-Regular.ttf', 12)
         self.create_buttons()
+
+    def get_cached_image(self, img_path, size):
+        """
+        Obtiene una imagen del caché. Si no existe, la carga, escala y guarda en caché.
+        
+        Args:
+            img_path: Ruta de la imagen
+            size: Tupla (ancho, alto) para escalar
+        
+        Returns:
+            Superficie pygame con la imagen escalada
+        """
+        cache_key = (img_path, size)
+        
+        if cache_key not in self.image_cache:
+            try:
+                img = pygame.image.load(img_path).convert_alpha()
+                img = pygame.transform.scale(img, size)
+                self.image_cache[cache_key] = img
+            except Exception as e:
+                # Si hay error al cargar, devolver None
+                return None
+        
+        return self.image_cache[cache_key]
 
     def create_buttons(self):
 
@@ -96,9 +122,9 @@ class Visualization:
                     pygame.draw.rect(self.screen, BASE_COLOR, rect, 0)  # Relleno sólido
                 
                 if node.state == 'resource' and node.content:
-                    img = pygame.image.load(node.content.img_path).convert_alpha()
-                    img = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE))
-                    self.screen.blit(img, (x, y))
+                    img = self.get_cached_image(node.content.img_path, (CELL_SIZE, CELL_SIZE))
+                    if img:
+                        self.screen.blit(img, (x, y))
                 # Ya no dibujamos las minas aquí porque drawMines se encarga
                 # Dibujar vehículos (pueden estar en estado "vehicle" o en bases con contenido)
                 if (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
@@ -122,18 +148,18 @@ class Visualization:
                             # Cargar y renderizar la imagen del vehículo con tamaño aumentado
                             VEHICLE_SCALE = 2.5  # Factor de escala para hacer vehículos más grandes
                             vehicle_size = int(CELL_SIZE * VEHICLE_SCALE)
-                            img = pygame.image.load(img_path).convert_alpha()
-                            img = pygame.transform.scale(img, (vehicle_size, vehicle_size))
+                            img = self.get_cached_image(img_path, (vehicle_size, vehicle_size))
                             
-                            # Cada jugador ya tiene sus propias imágenes que apuntan hacia el centro
-                            # Jugador_1: usa *1.png (apuntan a la derecha →)
-                            # Jugador_2: usa *2.png (apuntan a la izquierda ←)
-                            # No es necesario voltear las imágenes
-                            
-                            # Centrar la imagen más grande en la celda
-                            offset_x = x - (vehicle_size - CELL_SIZE) // 2
-                            offset_y = y - (vehicle_size - CELL_SIZE) // 2
-                            self.screen.blit(img, (offset_x, offset_y))
+                            if img:
+                                # Cada jugador ya tiene sus propias imágenes que apuntan hacia el centro
+                                # Jugador_1: usa *1.png (apuntan a la derecha →)
+                                # Jugador_2: usa *2.png (apuntan a la izquierda ←)
+                                # No es necesario voltear las imágenes
+                                
+                                # Centrar la imagen más grande en la celda
+                                offset_x = x - (vehicle_size - CELL_SIZE) // 2
+                                offset_y = y - (vehicle_size - CELL_SIZE) // 2
+                                self.screen.blit(img, (offset_x, offset_y))
                         else:
                             # Fallback: dibujar círculo si no hay imagen
                             color = getattr(vehicle_obj, "color", (255, 255, 255))
@@ -179,8 +205,15 @@ class Visualization:
             pass  # Si hay error, no mostrar información
 
 class Button:
+    # Cache compartido de imágenes para todos los botones
+    _image_cache = {}
+    
     def __init__(self, image_path, position, offset=(0,0), action=None):
-        self.image = pygame.image.load(image_path).convert_alpha()
+        # Usar caché para cargar imagen solo una vez
+        if image_path not in Button._image_cache:
+            Button._image_cache[image_path] = pygame.image.load(image_path).convert_alpha()
+        
+        self.image = Button._image_cache[image_path]
         self.position = position
         self.offset = offset
         self.rect = align(self.image, position, offset)

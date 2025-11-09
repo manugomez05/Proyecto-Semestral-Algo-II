@@ -270,6 +270,9 @@ class MineManager:
                 self.addRandomMine(type_, rows, cols, margin=margin, map_graph=map_graph)
 
 
+# Cache global para rectángulos pre-calculados
+_rect_cache = {}
+
 # Función para dibujar las minas en la superficie de pygame
 def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int, offset_x: int = 0, offset_y: int = 0) -> None:
     try:
@@ -285,6 +288,13 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
     # Convierte coordenadas de celda a píxeles considerando los offsets
     def cellToPx(row: int, col: int) -> tuple[int, int]:
         return offset_x + col * cell_size, offset_y + row * cell_size
+    
+    # Obtiene un rectángulo del caché o lo crea
+    def get_cached_rect(x: int, y: int) -> pygame.Rect:
+        cache_key = (x, y, cell_size)
+        if cache_key not in _rect_cache:
+            _rect_cache[cache_key] = pygame.Rect(x, y, cell_size, cell_size)
+        return _rect_cache[cache_key]
 
     # Dibuja cada mina según su tipo
     for mine in mines.all():
@@ -310,7 +320,7 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
                     if 0 <= current_row < rows and 0 <= current_col < cols:
                         if (delta_row * delta_row + delta_col * delta_col) <= radius * radius:
                             x, y = cellToPx(current_row, current_col)
-                            rect = pygame.Rect(x, y, cell_size, cell_size)
+                            rect = get_cached_rect(x, y)
                             
                             # Centro en rojo, radio en amarillo
                             if delta_row == 0 and delta_col == 0:
@@ -331,7 +341,7 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
             # Solo dibuja la línea horizontal (1 fila)
             for current_col in range(start_col, end_col + 1):
                 x, y = cellToPx(mine_row, current_col)
-                rect = pygame.Rect(x, y, cell_size, cell_size)
+                rect = get_cached_rect(x, y)
                 
                 # Centro en rojo, resto en amarillo
                 if current_col == mine_col:
@@ -351,7 +361,7 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
             # Solo dibuja la línea vertical (1 columna)
             for current_row in range(start_row, end_row + 1):
                 x, y = cellToPx(current_row, mine_col)
-                rect = pygame.Rect(x, y, cell_size, cell_size)
+                rect = get_cached_rect(x, y)
                 
                 # Centro en rojo, resto en amarillo
                 if current_row == mine_row:
