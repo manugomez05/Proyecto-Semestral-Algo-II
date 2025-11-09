@@ -47,6 +47,9 @@ class GameEngine:
         
         # Estado del juego terminado
         self.game_over_info = None  # Información del ganador
+        
+        # Sistema de animaciones de colisiones
+        self.collision_animations = []  # Lista de animaciones activas
 
         # Generar posiciones
         base_positions = self.map.generate_bases()
@@ -74,13 +77,53 @@ class GameEngine:
         # También imprimir en consola (DESACTIVADO para no saturar)
         # print(f"[Tick {self.tick}] [{event_type.upper()}] {message}")
     
+    def add_collision_animation(self, position, animation_type="vehicle"):
+        """Agrega una animación de colisión en la posición especificada
+        
+        Args:
+            position: Tupla (row, col) donde ocurrió la colisión
+            animation_type: 'vehicle' para colisión entre vehículos, 'mine' para colisión con mina
+        """
+        animation = {
+            'position': position,
+            'type': animation_type,
+            'frame': 0,  # Frame actual de la animación
+            'max_frames': 20,  # Duración total de la animación en frames
+        }
+        self.collision_animations.append(animation)
+    
+    def update_collision_animations(self):
+        """Actualiza todas las animaciones de colisión activas"""
+        # Incrementar frame de cada animación y eliminar las completadas
+        animations_to_remove = []
+        for i, anim in enumerate(self.collision_animations):
+            anim['frame'] += 1
+            if anim['frame'] >= anim['max_frames']:
+                animations_to_remove.append(i)
+        
+        # Eliminar animaciones completadas (en orden inverso para no alterar índices)
+        for i in reversed(animations_to_remove):
+            self.collision_animations.pop(i)
+    
     def init_game(self):
         print("Inicializando mapa...")
         self.map.clear_map()
         self.debug_events = []  # Limpiar eventos al iniciar nuevo juego
+        self.collision_animations = []  # Limpiar animaciones al iniciar nuevo juego
         self.tick = 0  # Resetear tick a 0
         self.start_time = time.time()  # Resetear tiempo de inicio
         self.game_over_info = None  # Resetear información de game over
+        # Variables de timeout para detectar juegos estancados
+        self._last_score_change_tick = 0
+        self._last_total_score = 0
+        
+        # Resetear puntajes de los jugadores
+        self.player1.score = 0
+        self.player2.score = 0
+        
+        # Recrear flotas de vehículos (resetear estado de vehículos)
+        self.player1.vehicles = self.player1._create_fleet()
+        self.player2.vehicles = self.player2._create_fleet()
         
         # Limpiar estados guardados anteriores para evitar confusión
         try:
@@ -344,20 +387,70 @@ class GameEngine:
                                  for col in range(self.map.cols) 
                                  if self.map.graph.get_node(row, col).state == "resource")
         
-        # Condición 2: No hay vehículos activos (ni en base, ni en misión)
+        # Condición 2: Contar vehículos por estado
         p1_active_vehicles = sum(1 for v in self.player1.vehicles.values() 
                                 if v.status not in ["destroyed"])
         p2_active_vehicles = sum(1 for v in self.player2.vehicles.values() 
                                 if v.status not in ["destroyed"])
         
-        # El juego termina si no hay recursos O si no hay vehículos
-        if resources_remaining == 0:
-            self.add_debug_event('system', "🏁 Fin del juego: No hay más recursos", (255, 255, 0))
-            return True, "No quedan recursos en el mapa"
+        # Contar vehículos en misión/retorno (que no están en base)
+        p1_vehicles_outside_base = sum(1 for v in self.player1.vehicles.values() 
+                                       if v.status in ["in_mission", "returning", "need_return", "moving"])
+        p2_vehicles_outside_base = sum(1 for v in self.player2.vehicles.values() 
+                                       if v.status in ["in_mission", "returning", "need_return", "moving"])
         
+        # Contar vehículos con recursos recolectados
+        p1_vehicles_with_resources = sum(1 for v in self.player1.vehicles.values() 
+                                         if v.status not in ["destroyed"] and getattr(v, "collected_value", 0) > 0)
+        p2_vehicles_with_resources = sum(1 for v in self.player2.vehicles.values() 
+                                         if v.status not in ["destroyed"] and getattr(v, "collected_value", 0) > 0)
+        
+        # El juego termina por falta de vehículos si ambos equipos no tienen vehículos activos
         if p1_active_vehicles == 0 and p2_active_vehicles == 0:
             self.add_debug_event('system', "🏁 Fin del juego: No hay más vehículos", (255, 255, 0))
             return True, "Todos los vehículos han sido destruidos"
+        
+        # El juego termina por falta de recursos solo si:
+        # 1. No hay recursos en el mapa
+        # 2. No hay vehículos fuera de base (todos están en base, destruidos o terminaron)
+        # 3. No hay vehículos con recursos sin entregar
+        if resources_remaining == 0:
+            vehicles_outside = p1_vehicles_outside_base + p2_vehicles_outside_base
+            vehicles_with_resources = p1_vehicles_with_resources + p2_vehicles_with_resources
+            
+            if vehicles_outside == 0 and vehicles_with_resources == 0:
+                self.add_debug_event('system', "🏁 Fin del juego: No quedan recursos ni vehículos en misión", (255, 255, 0))
+                return True, "No quedan recursos y todos los vehículos han retornado"
+            else:
+                # Hay recursos sin entregar, esperar a que los vehículos regresen
+                pass
+        
+        # Timeout: si pasan muchos ticks sin cambios, terminar el juego
+        # (Para evitar juegos infinitos donde vehículos no recogen recursos disponibles)
+        if not hasattr(self, '_last_score_change_tick'):
+            self._last_score_change_tick = 0
+            self._last_total_score = 0
+        
+        current_total_score = self.player1.score + self.player2.score
+        if current_total_score != self._last_total_score:
+            self._last_score_change_tick = self.tick
+            self._last_total_score = current_total_score
+        
+        # Si pasan 500 ticks sin cambio en el puntaje y hay recursos disponibles, hay un problema
+        ticks_without_progress = self.tick - self._last_score_change_tick
+        
+        # Alertas progresivas de inactividad
+        if ticks_without_progress == 200 and resources_remaining > 0:
+            self.add_debug_event('system', f"⚠️ Sin progreso: {resources_remaining} recursos sin recoger", (255, 200, 0))
+        elif ticks_without_progress == 350 and resources_remaining > 0:
+            # Contar vehículos en base sin objetivo
+            p1_idle = sum(1 for v in self.player1.vehicles.values() if v.status == "in_base")
+            p2_idle = sum(1 for v in self.player2.vehicles.values() if v.status == "in_base")
+            self.add_debug_event('system', f"⚠️ P1:{p1_idle} P2:{p2_idle} vehículos inactivos", (255, 200, 0))
+        
+        if ticks_without_progress > 500 and resources_remaining > 0:
+            self.add_debug_event('system', "⏱️ Timeout: Sin progreso en 500 ticks", (255, 200, 0))
+            return True, f"Juego detenido por inactividad (quedan {resources_remaining} recursos)"
         
         return False, None
     
@@ -500,21 +593,32 @@ class GameEngine:
                 node = self.map.graph.get_node(row, col)
                 if node and (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
                     vehicle_content = node.content
-                    vehicle_obj = None
                     
-                    if isinstance(vehicle_content, dict):
-                        vehicle_obj = vehicle_content.get("object")
+                    # Manejar listas de vehículos (mismo equipo en misma celda)
+                    vehicles_to_check = []
+                    if isinstance(vehicle_content, list):
+                        vehicles_to_check = vehicle_content
                     else:
-                        vehicle_obj = vehicle_content
+                        vehicles_to_check = [vehicle_content]
                     
-                    if vehicle_obj and hasattr(vehicle_obj, "status") and vehicle_obj.status != "destroyed":
-                        # Verificar si la posición actual del vehículo está minada
-                        if self.map.mine_manager.isCellMined((row, col), self.tick):
-                            vehicle_id = getattr(vehicle_obj, "id", "unknown")
-                            vehicle_obj.status = "destroyed"
-                            vehicle_obj.collected_value = 0
-                            # Evento de debug
-                            self.add_debug_event('mine', f"💥 {vehicle_id} destruido por mina en {(row, col)}", (255, 100, 0))
+                    for vehicle_data in vehicles_to_check:
+                        vehicle_obj = None
+                        
+                        if isinstance(vehicle_data, dict):
+                            vehicle_obj = vehicle_data.get("object")
+                        else:
+                            vehicle_obj = vehicle_data
+                        
+                        if vehicle_obj and hasattr(vehicle_obj, "status") and vehicle_obj.status != "destroyed":
+                            # Verificar si la posición actual del vehículo está minada
+                            if self.map.mine_manager.isCellMined((row, col), self.tick):
+                                vehicle_id = getattr(vehicle_obj, "id", "unknown")
+                                vehicle_obj.status = "destroyed"
+                                vehicle_obj.collected_value = 0
+                                # Evento de debug
+                                self.add_debug_event('mine', f"💥 {vehicle_id} destruido por mina en {(row, col)}", (255, 100, 0))
+                                # Agregar animación de colisión con mina
+                                self.add_collision_animation((row, col), animation_type="mine")
 
     def _check_vehicle_collisions(self):
         """Detecta y procesa colisiones entre vehículos de equipos distintos"""
@@ -567,6 +671,8 @@ class GameEngine:
                     v1_str = ", ".join(vehicles1_ids) if vehicles1_ids else "ninguno"
                     v2_str = ", ".join(vehicles2_ids) if vehicles2_ids else "ninguno"
                     self.add_debug_event('collision', f"💥 COLISIÓN en {pos}: P1[{v1_str}] vs P2[{v2_str}]", (255, 50, 50))
+                    # Agregar animación de colisión entre vehículos
+                    self.add_collision_animation(pos, animation_type="vehicle")
     
     def _check_same_team_collisions(self):
         """Detecta colisiones entre vehículos del mismo equipo y reporta (NO deben destruirse)"""
@@ -636,15 +742,29 @@ class GameEngine:
                         # Puede estar en estado "vehicle" o en una base
                         if node.content:
                             vehicle_content = node.content
-                            node_vehicle_id = None
                             
-                            if isinstance(vehicle_content, dict):
-                                node_vehicle_id = vehicle_content.get("id")
+                            # Manejar listas de vehículos (mismo equipo en misma celda)
+                            if isinstance(vehicle_content, list):
+                                for vehicle_data in vehicle_content:
+                                    node_vehicle_id = None
+                                    if isinstance(vehicle_data, dict):
+                                        node_vehicle_id = vehicle_data.get("id")
+                                    else:
+                                        node_vehicle_id = getattr(vehicle_data, "id", None)
+                                    
+                                    if node_vehicle_id == vehicle_id:
+                                        vehicle_found = True
+                                        break
                             else:
-                                node_vehicle_id = getattr(vehicle_content, "id", None)
-                            
-                            if node_vehicle_id == vehicle_id:
-                                vehicle_found = True
+                                node_vehicle_id = None
+                                
+                                if isinstance(vehicle_content, dict):
+                                    node_vehicle_id = vehicle_content.get("id")
+                                else:
+                                    node_vehicle_id = getattr(vehicle_content, "id", None)
+                                
+                                if node_vehicle_id == vehicle_id:
+                                    vehicle_found = True
                         
                         # Si el vehículo no está en el mapa pero dice estar activo, marcarlo como destruido
                         # PERO solo si no está en una posición de base (puede estar retornando)
@@ -667,23 +787,57 @@ class GameEngine:
                 node = self.map.graph.get_node(row, col)
                 if node and (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
                     vehicle_content = node.content
-                    vehicle_obj = None
                     
-                    if isinstance(vehicle_content, dict):
-                        vehicle_obj = vehicle_content.get("object")
-                    else:
-                        vehicle_obj = vehicle_content
-                    
-                    if vehicle_obj and hasattr(vehicle_obj, "status"):
-                        if vehicle_obj.status == "destroyed":
-                            # Debug: reportar vehículo destruido
-                            vehicle_id = getattr(vehicle_obj, "id", "unknown")
+                    # Manejar listas de vehículos (mismo equipo en misma celda)
+                    if isinstance(vehicle_content, list):
+                        # Filtrar vehículos destruidos de la lista
+                        vehicles_to_keep = []
+                        for vehicle_data in vehicle_content:
+                            vehicle_obj = None
+                            if isinstance(vehicle_data, dict):
+                                vehicle_obj = vehicle_data.get("object")
+                            else:
+                                vehicle_obj = vehicle_data
                             
-                            # Limpiar el nodo
+                            # Mantener solo vehículos no destruidos
+                            if vehicle_obj and hasattr(vehicle_obj, "status"):
+                                if vehicle_obj.status != "destroyed":
+                                    vehicles_to_keep.append(vehicle_data)
+                        
+                        # Actualizar contenido del nodo
+                        if vehicles_to_keep:
+                            # Si quedan vehículos vivos, mantener la lista (o convertir a single si es 1)
+                            if len(vehicles_to_keep) == 1:
+                                node.content = vehicles_to_keep[0]
+                            else:
+                                node.content = vehicles_to_keep
+                        else:
+                            # Si no quedan vehículos vivos, limpiar el nodo
                             if node.state in ("base_p1", "base_p2"):
-                                # Restaurar estado de base sin vehículo
                                 node.state = node.state
                                 node.content = {}
                             else:
                                 node.state = "empty"
                                 node.content = {}
+                    else:
+                        # Manejar vehículo único
+                        vehicle_obj = None
+                        
+                        if isinstance(vehicle_content, dict):
+                            vehicle_obj = vehicle_content.get("object")
+                        else:
+                            vehicle_obj = vehicle_content
+                        
+                        if vehicle_obj and hasattr(vehicle_obj, "status"):
+                            if vehicle_obj.status == "destroyed":
+                                # Debug: reportar vehículo destruido
+                                vehicle_id = getattr(vehicle_obj, "id", "unknown")
+                                
+                                # Limpiar el nodo
+                                if node.state in ("base_p1", "base_p2"):
+                                    # Restaurar estado de base sin vehículo
+                                    node.state = node.state
+                                    node.content = {}
+                                else:
+                                    node.state = "empty"
+                                    node.content = {}

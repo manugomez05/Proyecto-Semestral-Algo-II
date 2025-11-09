@@ -171,7 +171,25 @@ class MapGraph:
                 if old_node.content:
                     try:
                         content = old_node.content
-                        if isinstance(content, dict):
+                        
+                        # Manejar listas de vehículos (mismo equipo en misma celda)
+                        if isinstance(content, list):
+                            # Buscar y eliminar solo este vehículo de la lista
+                            vehicle_id = vehicle.get("id") if isinstance(vehicle, dict) else getattr(vehicle, "id", None)
+                            for i, v in enumerate(content):
+                                v_id = v.get("id") if isinstance(v, dict) else getattr(v, "id", None)
+                                if v_id == vehicle_id:
+                                    content.pop(i)
+                                    should_clear = True
+                                    break
+                            
+                            # Si la lista queda vacía, limpiar el nodo
+                            if not content:
+                                should_clear = True
+                            else:
+                                # Si quedan vehículos, no limpiar el nodo completamente
+                                should_clear = False
+                        elif isinstance(content, dict):
                             vid = content.get("id")
                             if vid and ((isinstance(vehicle, dict) and vehicle.get("id") == vid) or (not isinstance(vehicle, dict) and getattr(vehicle, "id", None) == vid)):
                                 should_clear = True
@@ -187,7 +205,7 @@ class MapGraph:
                     if original_base_state:
                         # Si estaba en una base, restaurar el estado de la base sin el vehículo
                         old_node.state = original_base_state
-                        old_node.content = {}
+                        old_node.content = {} if not isinstance(old_node.content, list) or not old_node.content else old_node.content
                     else:
                         # Si no estaba en una base, limpiar completamente
                         old_node.state = "empty"
@@ -267,8 +285,35 @@ class MapGraph:
                         same_team = (moving_in_p1 and existing_in_p1) or (moving_in_p2 and existing_in_p2)
                     
                     if same_team:
-                        # Vehículos del mismo equipo: no permitir el movimiento, no destruir
-                        return False
+                        # Vehículos del mismo equipo: permitir que compartan celda
+                        # Convertir el contenido a lista si no lo es
+                        if not isinstance(node.content, list):
+                            node.content = [node.content]
+                        
+                        # Agregar el nuevo vehículo a la lista
+                        if isinstance(vehicle, dict):
+                            node.content.append(vehicle)
+                        else:
+                            node.content.append({
+                                "id": getattr(vehicle, "id", None),
+                                "type": getattr(vehicle, "type", None),
+                                "color": getattr(vehicle, "color", None),
+                                "position": (new_row, new_col),
+                                "object": vehicle
+                            })
+                        
+                        # Actualizar posición del vehículo
+                        if hasattr(vehicle, "move_to"):
+                            try:
+                                vehicle.move_to(new_row, new_col)
+                            except Exception:
+                                vehicle.position = (new_row, new_col)
+                        else:
+                            if isinstance(vehicle, dict):
+                                vehicle["position"] = (new_row, new_col)
+                        
+                        # Nota: Los vehículos del mismo equipo no colisionan, continúan su camino
+                        return True
                     else:
                         # Vehículos de equipos diferentes: destruir ambos
                         if existing_vehicle_obj and hasattr(existing_vehicle_obj, "status"):
@@ -295,8 +340,10 @@ class MapGraph:
         if node.state in ("base_p1", "base_p2"):
             original_base_state = node.state
 
-        # Si en la celda hay un recurso, intentar recolección
+        # Si en la celda hay un recurso, verificar si el vehículo puede recogerlo
         resource = node.content if node and node.state == "resource" else None
+        resource_picked = False  # Flag para saber si se recogió el recurso
+        
         if resource:
             # Determinar tipo y valor del recurso (soportar dict y objeto)
             # print("Recurso", resource)
@@ -318,8 +365,13 @@ class MapGraph:
             else:
                 veh_obj = vehicle
 
-            # Intentar que el vehículo recoja el recurso si tenemos el objeto y puede recoger ese tipo
-            if veh_obj and hasattr(veh_obj, "can_pick") and res_type and veh_obj.can_pick(res_type):
+            # Verificar si el vehículo PUEDE recoger este tipo de recurso
+            can_pick_resource = False
+            if veh_obj and hasattr(veh_obj, "can_pick") and res_type:
+                can_pick_resource = veh_obj.can_pick(res_type)
+            
+            if can_pick_resource:
+                # El vehículo PUEDE recoger este recurso, intentar recolección
                 try:
                     picked = veh_obj.pick_up(res_type, value=res_value)
                 except Exception:
@@ -329,10 +381,10 @@ class MapGraph:
                     # eliminar recurso del mapa
                     node.state = "empty"
                     node.content = {}
+                    resource_picked = True
 
                     # si después de recoger no quedan viajes (trips_done_since_base == 0) o estado exige volver, marcar
                     try:
-
                         # print("ENTRO")
                         max_consecutive_trips = getattr(veh_obj, "max_consecutive_trips", None)
 
@@ -343,7 +395,59 @@ class MapGraph:
                             pass
                     except Exception:
                         pass
+                else:
+                    # Intentó recoger pero falló (capacidad llena, etc.)
+                    # No permitir el movimiento, restaurar posición anterior
+                    if old_pos and isinstance(old_pos, tuple) and len(old_pos) == 2:
+                        old_row, old_col = old_pos
+                        old_node = self.get_node(old_row, old_col)
+                        if old_node:
+                            # Restaurar el vehículo en su posición anterior
+                            if isinstance(vehicle, dict):
+                                old_node.content = vehicle
+                            else:
+                                old_node.content = {
+                                    "id": getattr(vehicle, "id", None),
+                                    "type": getattr(vehicle, "type", None),
+                                    "color": getattr(vehicle, "color", None),
+                                    "position": old_pos,
+                                    "object": vehicle
+                                }
+                            # Restaurar el estado del nodo
+                            if old_node.state in ("base_p1", "base_p2"):
+                                # Ya es una base, mantener el estado
+                                pass
+                            else:
+                                old_node.state = "vehicle"
+                    return False
+            else:
+                # El vehículo NO PUEDE recoger este tipo de recurso (ej: moto con cargo)
+                # NO permitir el movimiento - el recurso actúa como obstáculo temporal
+                # Restaurar el vehículo en su posición anterior
+                if old_pos and isinstance(old_pos, tuple) and len(old_pos) == 2:
+                    old_row, old_col = old_pos
+                    old_node = self.get_node(old_row, old_col)
+                    if old_node:
+                        # Restaurar el vehículo en su posición anterior
+                        if isinstance(vehicle, dict):
+                            old_node.content = vehicle
+                        else:
+                            old_node.content = {
+                                "id": getattr(vehicle, "id", None),
+                                "type": getattr(vehicle, "type", None),
+                                "color": getattr(vehicle, "color", None),
+                                "position": old_pos,
+                                "object": vehicle
+                            }
+                        # Restaurar el estado del nodo
+                        if old_node.state in ("base_p1", "base_p2"):
+                            # Ya es una base, mantener el estado
+                            pass
+                        else:
+                            old_node.state = "vehicle"
+                return False
 
+        # Solo colocar el vehículo en el mapa si no hay recurso sin recoger
         # Guardar referencia al vehículo (no crear copia) si es dict;
         # si es objeto, guardar un dict ligero que referencia el objeto para visualización.
         # Preservar el estado de la base si el vehículo está en una base

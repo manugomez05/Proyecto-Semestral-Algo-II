@@ -70,36 +70,91 @@ class Visualization:
         assets_path = base_path.parent / 'assets'
 
         from functools import partial
-        self.buttons = [
-
-            Button(str(assets_path / 'initBtn.png'), 'bottom', (-220,0), partial(self.engine.init_game)),
-            Button(str(assets_path / 'playBtn.png'), 'bottom', (-50,0), partial(self.engine.start_game)),
-            Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (80,0), partial(self.engine.step_backward)),
-            Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (170,0), partial(self.engine.step_forward)),
-            Button(str(assets_path / 'stopBtn.png'), 'bottom', (270,0), partial(self.engine.stop_game)),
-            Button(str(assets_path / 'saveBtn.png'), 'bottomLeft', (40,0), """partial(self.engine.save_game)"""),
-        ]
+        
+        # Crear botón INIT por separado para controlar su visibilidad
+        self.init_button = Button(str(assets_path / 'initBtn.png'), 'bottom', (-220,0), partial(self.engine.init_game))
+        
+        # Botones principales con dos posiciones: con INIT y sin INIT (centrados)
+        # Cuando INIT está visible: posiciones originales
+        # Cuando INIT no está visible: posiciones centradas (desplazadas -85px a la izquierda)
+        self.play_button = Button(str(assets_path / 'playBtn.png'), 'bottom', (-50,0), partial(self.engine.start_game))
+        self.backward_button = Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (80,0), partial(self.engine.step_backward))
+        self.forward_button = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (170,0), partial(self.engine.step_forward))
+        self.stop_button = Button(str(assets_path / 'stopBtn.png'), 'bottom', (270,0), partial(self.engine.stop_game))
+        
+        # Posiciones alternativas (centradas) cuando INIT no está visible
+        self.play_button_centered = Button(str(assets_path / 'playBtn.png'), 'bottom', (-135,0), partial(self.engine.start_game))
+        self.backward_button_centered = Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (-5,0), partial(self.engine.step_backward))
+        self.forward_button_centered = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (85,0), partial(self.engine.step_forward))
+        self.stop_button_centered = Button(str(assets_path / 'stopBtn.png'), 'bottom', (185,0), partial(self.engine.stop_game))
+        
+        # Botón save siempre en la misma posición
+        self.save_button = Button(str(assets_path / 'saveBtn.png'), 'bottomLeft', (40,0), """partial(self.engine.save_game)""")
+        
+        # Lista de botones para manejar eventos (se actualizará dinámicamente)
+        self.buttons = []
 
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exit()
-            for b in self.buttons:
-                b.handle_event(event)
+            
+            # Determinar qué botones mostrar según el estado
+            show_init = self.engine.state in ("stopped", "game_over")
+            
+            # Manejar botón INIT solo si debe ser visible
+            if show_init:
+                self.init_button.handle_event(event)
+                # Usar botones en posiciones normales (con INIT visible)
+                self.play_button.handle_event(event)
+                self.backward_button.handle_event(event)
+                self.forward_button.handle_event(event)
+                self.stop_button.handle_event(event)
+            else:
+                # Usar botones centrados (sin INIT)
+                self.play_button_centered.handle_event(event)
+                self.backward_button_centered.handle_event(event)
+                self.forward_button_centered.handle_event(event)
+                self.stop_button_centered.handle_event(event)
+            
+            # Botón save siempre disponible
+            self.save_button.handle_event(event)
 
     def render(self):
         self.screen.fill(BLACK)
+        
+        # Actualizar animaciones en cada frame (para fluidez incluso en pausa)
+        self.engine.update_collision_animations()
+        
+        # Determinar si mostrar botón INIT
+        show_init = self.engine.state in ("stopped", "game_over")
         
         # Si el juego terminó, mostrar pantalla de game over
         if self.engine.state == "game_over":
             self.drawGameOverScreen()
         else:
             self.drawMap()
+            self.drawCollisionAnimations()  # Dibujar animaciones de colisiones
             #self.drawDebugPanel()  # Mostrar panel de debug (DESACTIVADO)
             #self.drawTickInfo()  # Mostrar información del tick
             
-            for b in self.buttons:
-                b.draw(self.screen)
+            # Dibujar botones según visibilidad de INIT
+            if show_init:
+                # Dibujar INIT y botones en posición normal
+                self.init_button.draw(self.screen)
+                self.play_button.draw(self.screen)
+                self.backward_button.draw(self.screen)
+                self.forward_button.draw(self.screen)
+                self.stop_button.draw(self.screen)
+            else:
+                # Dibujar botones centrados (sin INIT)
+                self.play_button_centered.draw(self.screen)
+                self.backward_button_centered.draw(self.screen)
+                self.forward_button_centered.draw(self.screen)
+                self.stop_button_centered.draw(self.screen)
+            
+            # Botón save siempre visible
+            self.save_button.draw(self.screen)
         
         pygame.display.flip()
 
@@ -136,43 +191,142 @@ class Visualization:
                 # Dibujar vehículos (pueden estar en estado "vehicle" o en bases con contenido)
                 if (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
                     v = node.content
-                    # Obtener el objeto vehículo real para verificar status
-                    vehicle_obj = None
-                    if isinstance(v, dict):
-                        vehicle_obj = v.get("object")
-                    else:
-                        vehicle_obj = v
                     
-                    # Verificar que el vehículo no esté destruido
-                    if vehicle_obj:
-                        status = getattr(vehicle_obj, "status", None)
-                        if status == "destroyed":
-                            continue  # No dibujar vehículos destruidos
-                        
-                        # Obtener la ruta de imagen del vehículo
-                        img_path = getattr(vehicle_obj, "img_path", None)
-                        if img_path:
-                            # Cargar y renderizar la imagen del vehículo con tamaño aumentado
-                            VEHICLE_SCALE = 2.5  # Factor de escala para hacer vehículos más grandes
-                            vehicle_size = int(CELL_SIZE * VEHICLE_SCALE)
-                            img = self.get_cached_image(img_path, (vehicle_size, vehicle_size))
-                            
-                            if img:
-                                # Cada jugador ya tiene sus propias imágenes que apuntan hacia el centro
-                                # Jugador_1: usa *1.png (apuntan a la derecha →)
-                                # Jugador_2: usa *2.png (apuntan a la izquierda ←)
-                                # No es necesario voltear las imágenes
-                                
-                                # Centrar la imagen más grande en la celda
-                                offset_x = x - (vehicle_size - CELL_SIZE) // 2
-                                offset_y = y - (vehicle_size - CELL_SIZE) // 2
-                                self.screen.blit(img, (offset_x, offset_y))
+                    # Manejar listas de vehículos (mismo equipo en misma celda)
+                    vehicles_to_draw = []
+                    if isinstance(v, list):
+                        vehicles_to_draw = v
+                    else:
+                        vehicles_to_draw = [v]
+                    
+                    # Dibujar cada vehículo en la celda
+                    for idx, vehicle_data in enumerate(vehicles_to_draw):
+                        # Obtener el objeto vehículo real para verificar status
+                        vehicle_obj = None
+                        if isinstance(vehicle_data, dict):
+                            vehicle_obj = vehicle_data.get("object")
                         else:
-                            # Fallback: dibujar círculo si no hay imagen
-                            color = getattr(vehicle_obj, "color", (255, 255, 255))
-                            pygame.draw.circle(self.screen, color, rect.center, 6)
+                            vehicle_obj = vehicle_data
+                        
+                        # Verificar que el vehículo no esté destruido
+                        if vehicle_obj:
+                            status = getattr(vehicle_obj, "status", None)
+                            if status == "destroyed":
+                                continue  # No dibujar vehículos destruidos
+                            
+                            # Obtener la ruta de imagen del vehículo
+                            img_path = getattr(vehicle_obj, "img_path", None)
+                            if img_path:
+                                # Cargar y renderizar la imagen del vehículo con tamaño aumentado
+                                VEHICLE_SCALE = 2.5  # Factor de escala para hacer vehículos más grandes
+                                vehicle_size = int(CELL_SIZE * VEHICLE_SCALE)
+                                img = self.get_cached_image(img_path, (vehicle_size, vehicle_size))
+                                
+                                if img:
+                                    # Cada jugador ya tiene sus propias imágenes que apuntan hacia el centro
+                                    # Jugador_1: usa *1.png (apuntan a la derecha →)
+                                    # Jugador_2: usa *2.png (apuntan a la izquierda ←)
+                                    # No es necesario voltear las imágenes
+                                    
+                                    # Si hay múltiples vehículos, desplazarlos ligeramente para que se vean
+                                    displacement = 0
+                                    if len(vehicles_to_draw) > 1:
+                                        # Desplazar cada vehículo adicional ligeramente
+                                        displacement = idx * 3  # 3 píxeles de desplazamiento por vehículo
+                                    
+                                    # Centrar la imagen más grande en la celda
+                                    offset_x = x - (vehicle_size - CELL_SIZE) // 2 + displacement
+                                    offset_y = y - (vehicle_size - CELL_SIZE) // 2 + displacement
+                                    self.screen.blit(img, (offset_x, offset_y))
+                            else:
+                                # Fallback: dibujar círculo si no hay imagen
+                                color = getattr(vehicle_obj, "color", (255, 255, 255))
+                                # Desplazar círculos si hay múltiples vehículos
+                                displacement = idx * 3 if len(vehicles_to_draw) > 1 else 0
+                                circle_center = (rect.center[0] + displacement, rect.center[1] + displacement)
+                                pygame.draw.circle(self.screen, color, circle_center, 6)
 
                 pygame.draw.rect(self.screen, PALETTE_6, rect, 1)
+
+    def drawCollisionAnimations(self):
+        """Dibuja las animaciones de colisiones activas"""
+        for anim in self.engine.collision_animations:
+            pos = anim['position']
+            frame = anim['frame']
+            max_frames = anim['max_frames']
+            anim_type = anim['type']
+            
+            # Convertir posición de celda a píxeles
+            row, col = pos
+            x = col * CELL_SIZE + 390
+            y = row * CELL_SIZE + 20
+            center_x = x + CELL_SIZE // 2
+            center_y = y + CELL_SIZE // 2
+            
+            # Calcular progreso de la animación (0.0 a 1.0)
+            progress = frame / max_frames
+            
+            # Efecto de expansión y desvanecimiento
+            if anim_type == "vehicle":
+                # Colisión entre vehículos: explosión roja/naranja
+                self._draw_explosion_effect(center_x, center_y, progress, 
+                                            colors=[(255, 0, 0), (255, 100, 0), (255, 200, 0)])
+            elif anim_type == "mine":
+                # Colisión con mina: explosión amarilla/naranja
+                self._draw_explosion_effect(center_x, center_y, progress,
+                                            colors=[(255, 200, 0), (255, 150, 0), (200, 100, 0)])
+    
+    def _draw_explosion_effect(self, center_x, center_y, progress, colors):
+        """Dibuja un efecto de explosión con círculos concéntricos
+        
+        Args:
+            center_x, center_y: Coordenadas del centro de la explosión
+            progress: Progreso de la animación (0.0 a 1.0)
+            colors: Lista de colores para los círculos concéntricos
+        """
+        # Fase 1 (0-0.4): Expansión rápida
+        # Fase 2 (0.4-1.0): Desvanecimiento
+        
+        if progress < 0.4:
+            # Fase de expansión
+            scale = progress / 0.4  # 0 a 1
+            alpha = 255
+        else:
+            # Fase de desvanecimiento
+            scale = 1.0
+            alpha = int(255 * (1.0 - (progress - 0.4) / 0.6))
+        
+        # Dibujar múltiples círculos concéntricos
+        max_radius = int(CELL_SIZE * 2 * scale)
+        
+        for i, color in enumerate(colors):
+            radius = max(1, max_radius - i * 8)
+            if radius > 0:
+                # Crear superficie temporal con alpha
+                temp_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+                # Aplicar alpha al color
+                color_with_alpha = (*color, alpha)
+                pygame.draw.circle(temp_surface, color_with_alpha, (radius, radius), radius)
+                # Dibujar en pantalla
+                self.screen.blit(temp_surface, (center_x - radius, center_y - radius))
+        
+        # Agregar partículas dispersas en la fase de expansión
+        if progress < 0.5:
+            import random
+            random.seed(int(center_x * center_y))  # Seed para consistencia
+            num_particles = 8
+            for i in range(num_particles):
+                angle = (i / num_particles) * 2 * 3.14159
+                distance = int(max_radius * 1.5 * progress)
+                particle_x = int(center_x + distance * pygame.math.Vector2(1, 0).rotate_rad(angle).x)
+                particle_y = int(center_y + distance * pygame.math.Vector2(1, 0).rotate_rad(angle).y)
+                particle_radius = max(1, int(4 * (1 - progress)))
+                particle_color = (*colors[0], alpha)
+                
+                # Crear superficie temporal para la partícula
+                particle_surface = pygame.Surface((particle_radius * 2, particle_radius * 2), pygame.SRCALPHA)
+                pygame.draw.circle(particle_surface, particle_color, (particle_radius, particle_radius), particle_radius)
+                self.screen.blit(particle_surface, (particle_x - particle_radius, particle_y - particle_radius))
 
     def drawDebugPanel(self):
         """Dibuja el panel de debug con eventos de colisiones y destrucciones"""
@@ -377,9 +531,13 @@ class Visualization:
         restart_rect = restart_text.get_rect(center=(screen_width // 2, y_offset))
         self.screen.blit(restart_text, restart_rect)
 
-        # Dibujar los botones (visibles)
-        for b in self.buttons:
-            b.draw(self.screen)
+        # Dibujar botones en la pantalla de game over (con INIT visible)
+        self.init_button.draw(self.screen)
+        self.play_button.draw(self.screen)
+        self.backward_button.draw(self.screen)
+        self.forward_button.draw(self.screen)
+        self.stop_button.draw(self.screen)
+        self.save_button.draw(self.screen)
     
     def _draw_player_stats(self, player_info, x, y, width, info_font, small_font, color):
         """Dibuja las estadísticas de un jugador"""
