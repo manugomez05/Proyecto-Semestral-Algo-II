@@ -21,7 +21,7 @@ MINE_PARAMS: Dict[MineType, Dict[str, int]] = {
     MineType.O2: {"radius": 2, "static": True},
     MineType.T1: {"half_width": 3, "static": True},
     MineType.T2: {"half_width": 2, "static": True},
-    MineType.G1: {"radius": 2, "period": 5, "static": False, "time_based": True},  # 5 segundos
+    MineType.G1: {"radius": 2, "period": 5, "static": False},  # 5 ticks
 } 
 
 # Tipo para coordenadas de celda (fila, columna)
@@ -42,8 +42,8 @@ class Mine:
 
 
     def update(self, tick: int) -> None: 
-        """Actualiza el estado de minas dinámicas según el tiempo"""
-        if not self.static and tick >= self.next_activation:
+        """Actualiza el estado de minas dinámicas según el tick actual"""
+        if not self.static and self.period > 0:
             self.active = not self.active
             self.next_activation = tick + self.period
 
@@ -55,11 +55,14 @@ class Mine:
 
     def contains(self, cell: Cell, tick: int) -> bool:
         """Verifica si una celda está dentro del área de efecto"""
-        # Calcula estado de activación
+        # Para minas dinámicas, verificar el estado actual de activación
         if not self.static:
-            if tick >= self.next_activation:
-                toggles = (tick - self.next_activation) // self.period + 1 if self.period > 0 else 0
-                is_active = (self.active if toggles % 2 == 0 else (not self.active))
+            # Calcular cuántos períodos completos han pasado
+            if self.period > 0:
+                cycles_elapsed = tick // self.period
+                # Alterna entre activa/inactiva cada período
+                # Ciclo par = activa, ciclo impar = inactiva
+                is_active = (cycles_elapsed % 2 == 0)
             else:
                 is_active = self.active
         else:

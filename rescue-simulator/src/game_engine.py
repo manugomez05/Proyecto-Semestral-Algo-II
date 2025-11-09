@@ -265,11 +265,14 @@ class GameEngine:
         current_time = time.time()
         elapsed_time = current_time - self.start_time
 
-        # Actualizar minas dinámicas (G1) con tiempo real
+        # Actualizar minas dinámicas (G1) basadas en ticks
         try:
             self.map.mine_manager.updateAll(self.tick, self.map.rows, self.map.cols, elapsed_time, self.map)
         except Exception as e:
             print(f"Error al actualizar minas: {e}")
+
+        # Verificar si algún vehículo está en una posición minada después de actualizar las minas
+        self._check_vehicles_on_mines()
 
         resources = self.map.all_resources()
         
@@ -293,6 +296,28 @@ class GameEngine:
         #     except Exception as e:
         #         print(f"Error al ejecutar estrategia player2: {e}")
     
+    def _check_vehicles_on_mines(self):
+        """Verifica si algún vehículo está en una posición minada y lo destruye"""
+        for row in range(self.map.rows):
+            for col in range(self.map.cols):
+                node = self.map.graph.get_node(row, col)
+                if node and (node.state == "vehicle" or node.state in ("base_p1", "base_p2")) and node.content:
+                    vehicle_content = node.content
+                    vehicle_obj = None
+                    
+                    if isinstance(vehicle_content, dict):
+                        vehicle_obj = vehicle_content.get("object")
+                    else:
+                        vehicle_obj = vehicle_content
+                    
+                    if vehicle_obj and hasattr(vehicle_obj, "status") and vehicle_obj.status != "destroyed":
+                        # Verificar si la posición actual del vehículo está minada
+                        if self.map.mine_manager.isCellMined((row, col), self.tick):
+                            vehicle_id = getattr(vehicle_obj, "id", "unknown")
+                            print(f"[MINE EXPLOSION] Vehículo {vehicle_id} explotó en mina en posición ({row}, {col}) en tick {self.tick}")
+                            vehicle_obj.status = "destroyed"
+                            vehicle_obj.collected_value = 0
+
     def _cleanup_destroyed_vehicles(self):
         """Limpia los vehículos destruidos del mapa"""
         for row in range(self.map.rows):

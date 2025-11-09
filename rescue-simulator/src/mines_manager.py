@@ -17,20 +17,18 @@ class MineManager:
     def addMine(self, type: MineType, center: Cell) -> Mine:
         """Agrega una nueva mina al simulador"""
         params = MINE_PARAMS[type]
+        period = params.get("period", 0)
         mine = Mine(
             id=self.next_id,
             type=type,
             center=center,
             radius=params.get("radius", 0),
             half_width=params.get("half_width", 0),
-            period=params.get("period", 0),
+            period=period,
             static=params.get("static", True),
             active=True,
-            next_activation=0  # Empezar inmediatamente
+            next_activation=period  # Próxima activación en period ticks
         )
-        # Agregar atributo time_based si está en los parámetros
-        if params.get("time_based", False):
-            mine.time_based = True
         self.next_id += 1
         self.mines.append(mine)
         return mine 
@@ -47,28 +45,17 @@ class MineManager:
         """Actualiza todas las minas dinámicas"""
         for m in self.mines:
             if not m.static:
-                # Para minas basadas en tiempo (G1), usar tiempo real
-                if hasattr(m, 'time_based') and m.time_based:
-                    #print(f"DEBUG: G1 - tiempo: {elapsed_time:.1f}, next_activation: {m.next_activation:.1f}, activa: {m.active}")
-                    if elapsed_time >= m.next_activation:
-                        #print(f"DEBUG: G1 activándose en tiempo {elapsed_time:.1f}, estado actual: {m.active}")
-                        # Si es una mina G1 que se está reactivando, moverla a nueva posición
-                        if m.type == MineType.G1 and not m.active:
-                            #print(f"DEBUG: Moviendo G1 de {m.center} a nueva posición")
-                            self._moveG1Mine(m, tick, rows, cols, map_manager)
-                        m.update_time_based(elapsed_time)
-                else:
-                    # Para minas basadas en ticks (comportamiento original)
-                    if tick >= m.next_activation:
-                        m.update(tick)
-                    else:
-                        m.update(tick)
+                # Para minas dinámicas basadas en ticks
+                if tick >= m.next_activation:
+                    # Si es una mina G1 que se está reactivando (pasa de inactiva a activa), moverla a nueva posición
+                    if m.type == MineType.G1 and not m.active:
+                        self._moveG1Mine(m, tick, rows, cols, map_manager)
+                    m.update(tick)
 
     def isCellMined(self, cell: Cell, tick: int) -> bool:
         """Verifica si una celda está afectada por alguna mina"""
         for m in self.mines:
             if m.contains(cell, tick):
-                #print(f"DEBUG: Celda {cell} está minada por mina {m.type} en posición {m.center}")
                 return True
         return False
 
