@@ -89,11 +89,18 @@ class Visualization:
 
     def render(self):
         self.screen.fill(BLACK)
-        self.drawMap()
-        #self.drawTickInfo()  # Mostrar información del tick
-
-        for b in self.buttons:
-            b.draw(self.screen)
+        
+        # Si el juego terminó, mostrar pantalla de game over
+        if self.engine.state == "game_over":
+            self.drawGameOverScreen()
+        else:
+            self.drawMap()
+            #self.drawDebugPanel()  # Mostrar panel de debug (DESACTIVADO)
+            #self.drawTickInfo()  # Mostrar información del tick
+            
+            for b in self.buttons:
+                b.draw(self.screen)
+        
         pygame.display.flip()
 
     def drawMap(self):
@@ -167,6 +174,51 @@ class Visualization:
 
                 pygame.draw.rect(self.screen, PALETTE_6, rect, 1)
 
+    def drawDebugPanel(self):
+        """Dibuja el panel de debug con eventos de colisiones y destrucciones"""
+        try:
+            # Cargar fuente
+            import pygame
+            font = pygame.font.Font(None, 20)  # Fuente más pequeña para debug
+            font_large = pygame.font.Font(None, 28)  # Fuente más grande para tick
+            
+            # Posición del panel (esquina superior central)
+            panel_x = 440
+            panel_y = 10
+            line_height = 20
+            
+            # Mostrar tick actual
+            tick_text = font_large.render(f"TICK: {self.engine.tick}", True, (255, 255, 0))
+            self.screen.blit(tick_text, (panel_x, panel_y))
+            
+            # Título del panel
+            title = font.render("=== DEBUG LOG ===", True, (0, 255, 255))
+            self.screen.blit(title, (panel_x, panel_y + 30))
+            
+            # Dibujar eventos recientes (del más reciente al más antiguo)
+            y_offset = panel_y + 55
+            
+            if hasattr(self.engine, 'debug_events') and self.engine.debug_events:
+                # Mostrar eventos en orden inverso (más reciente arriba)
+                for event in reversed(self.engine.debug_events[-10:]):  # Últimos 10 eventos
+                    tick = event.get('tick', 0)
+                    event_type = event.get('type', 'unknown')
+                    message = event.get('message', '')
+                    color = event.get('color', (255, 255, 255))
+                    
+                    # Formatear el mensaje
+                    text = f"[T{tick:3d}] {message}"
+                    text_surface = font.render(text, True, color)
+                    self.screen.blit(text_surface, (panel_x, y_offset))
+                    y_offset += line_height
+            else:
+                # Sin eventos
+                no_events = font.render("Sin eventos recientes", True, (150, 150, 150))
+                self.screen.blit(no_events, (panel_x, y_offset))
+        
+        except Exception as e:
+            # Si hay error, no mostrar nada para no romper la visualización
+            pass
 
 
 
@@ -203,6 +255,141 @@ class Visualization:
                     self.screen.blit(change_text, (10, 100))
         except:
             pass  # Si hay error, no mostrar información
+
+    def drawGameOverScreen(self):
+        """Dibuja la pantalla de fin de juego con el ganador y estadísticas"""
+        if not self.engine.game_over_info:
+            return
+        
+        info = self.engine.game_over_info
+        screen_width, screen_height = self.screen.get_size()
+        
+        # Fondo semi-transparente oscuro
+        overlay = pygame.Surface((screen_width, screen_height))
+        overlay.set_alpha(220)
+        overlay.fill((15, 20, 35))
+        self.screen.blit(overlay, (0, 0))
+        
+        # Fuentes
+        try:
+            title_font = pygame.font.Font(None, 80)
+            header_font = pygame.font.Font(None, 50)
+            info_font = pygame.font.Font(None, 36)
+            small_font = pygame.font.Font(None, 28)
+        except:
+            title_font = pygame.font.Font(None, 80)
+            header_font = pygame.font.Font(None, 50)
+            info_font = pygame.font.Font(None, 36)
+            small_font = pygame.font.Font(None, 28)
+        
+        y_offset = 50
+        
+        # Título "FIN DEL JUEGO"
+        title = title_font.render("FIN DEL JUEGO", True, (255, 255, 100))
+        title_rect = title.get_rect(center=(screen_width // 2, y_offset))
+        self.screen.blit(title, title_rect)
+        y_offset += 100
+        
+        # Razón del fin del juego
+        reason_text = small_font.render(info["reason"], True, (200, 200, 200))
+        reason_rect = reason_text.get_rect(center=(screen_width // 2, y_offset))
+        self.screen.blit(reason_text, reason_rect)
+        y_offset += 60
+        
+        # Anuncio del ganador
+        winner_colors = {
+            "blue": (100, 150, 255),
+            "red": (255, 100, 100),
+            "gray": (150, 150, 150)
+        }
+        winner_color = winner_colors.get(info["winner_color"], (255, 255, 255))
+        
+        if info["winner"] == "Empate":
+            winner_text = header_font.render("¡EMPATE!", True, winner_color)
+        else:
+            winner_text = header_font.render(f"¡GANADOR: {info['winner'].upper()}!", True, winner_color)
+        
+        winner_rect = winner_text.get_rect(center=(screen_width // 2, y_offset))
+        self.screen.blit(winner_text, winner_rect)
+        y_offset += 80
+        
+        # Dividir pantalla en dos columnas para cada jugador
+        col_width = screen_width // 2
+        
+        # Información del Jugador 1
+        self._draw_player_stats(
+            info["player1"],
+            50,
+            y_offset,
+            col_width - 100,
+            info_font,
+            small_font,
+            (100, 150, 255)
+        )
+        
+        # Información del Jugador 2
+        self._draw_player_stats(
+            info["player2"],
+            screen_width // 2 + 50,
+            y_offset,
+            col_width - 100,
+            info_font,
+            small_font,
+            (255, 100, 100)
+        )
+        
+        # Instrucción para reiniciar
+        y_offset = screen_height - 80
+        restart_text = small_font.render("Presiona el botón INIT para jugar de nuevo", True, (200, 200, 200))
+        restart_rect = restart_text.get_rect(center=(screen_width // 2, y_offset))
+        self.screen.blit(restart_text, restart_rect)
+        
+        # Dibujar el botón INIT para que sea visible
+        for b in self.buttons:
+            b.draw(self.screen)
+    
+    def _draw_player_stats(self, player_info, x, y, width, info_font, small_font, color):
+        """Dibuja las estadísticas de un jugador"""
+        y_offset = y
+        
+        # Nombre del jugador
+        name_text = info_font.render(player_info["name"], True, color)
+        self.screen.blit(name_text, (x, y_offset))
+        y_offset += 50
+        
+        # Puntuación
+        score_text = info_font.render(f"Puntos: {player_info['score']}", True, (255, 255, 255))
+        self.screen.blit(score_text, (x, y_offset))
+        y_offset += 60
+        
+        # Estado de vehículos
+        vehicles_title = small_font.render("Estado de Vehículos:", True, (200, 200, 200))
+        self.screen.blit(vehicles_title, (x, y_offset))
+        y_offset += 40
+        
+        vehicles = player_info["vehicles"]
+        status_labels = {
+            "in_base": "En base",
+            "in_mission": "En misión",
+            "returning": "Regresando",
+            "job_done": "Trabajo hecho",
+            "destroyed": "Destruidos"
+        }
+        
+        status_colors = {
+            "in_base": (100, 255, 100),
+            "in_mission": (255, 200, 100),
+            "returning": (100, 200, 255),
+            "job_done": (150, 255, 150),
+            "destroyed": (255, 100, 100)
+        }
+        
+        for status, label in status_labels.items():
+            count = vehicles.get(status, 0)
+            color = status_colors.get(status, (255, 255, 255))
+            status_text = small_font.render(f"  {label}: {count}", True, color)
+            self.screen.blit(status_text, (x + 20, y_offset))
+            y_offset += 30
 
 class Button:
     # Cache compartido de imágenes para todos los botones

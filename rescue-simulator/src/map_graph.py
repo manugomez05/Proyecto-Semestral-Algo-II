@@ -230,56 +230,65 @@ class MapGraph:
                 pass  # Continuar con el movimiento normal
             else:
                 # Hay otro vehículo en la posición destino
-                # Verificar si son del mismo equipo
-                same_team = False
-                if player1 and player2:
-                    # Obtener IDs de vehículos de cada equipo
-                    p1_ids = set()
-                    p2_ids = set()
-                    
-                    if hasattr(player1, "vehicles"):
-                        if isinstance(player1.vehicles, dict):
-                            p1_ids = set(player1.vehicles.keys())
-                        else:
-                            p1_ids = {getattr(v, "id", None) for v in player1.vehicles if hasattr(v, "id")}
-                    
-                    if hasattr(player2, "vehicles"):
-                        if isinstance(player2.vehicles, dict):
-                            p2_ids = set(player2.vehicles.keys())
-                        else:
-                            p2_ids = {getattr(v, "id", None) for v in player2.vehicles if hasattr(v, "id")}
-                    
-                    # Verificar si ambos vehículos pertenecen al mismo equipo
-                    moving_in_p1 = moving_vehicle_id in p1_ids
-                    moving_in_p2 = moving_vehicle_id in p2_ids
-                    existing_in_p1 = existing_vehicle_id in p1_ids
-                    existing_in_p2 = existing_vehicle_id in p2_ids
-                    
-                    same_team = (moving_in_p1 and existing_in_p1) or (moving_in_p2 and existing_in_p2)
+                # Verificar si el vehículo existente ya está destruido
+                existing_is_destroyed = False
+                if existing_vehicle_obj and hasattr(existing_vehicle_obj, "status"):
+                    existing_is_destroyed = existing_vehicle_obj.status == "destroyed"
                 
-                if same_team:
-                    # Vehículos del mismo equipo: no permitir el movimiento, no destruir
-                    return False
+                # Si el vehículo existente ya está destruido, permitir el movimiento
+                if existing_is_destroyed:
+                    pass  # Continuar con el movimiento normal
                 else:
-                    # Vehículos de equipos diferentes: destruir ambos
-                    if existing_vehicle_obj and hasattr(existing_vehicle_obj, "status"):
-                        existing_vehicle_obj.status = "destroyed"
-                        existing_vehicle_obj.collected_value = 0
+                    # Verificar si son del mismo equipo
+                    same_team = False
+                    if player1 and player2:
+                        # Obtener IDs de vehículos de cada equipo
+                        p1_ids = set()
+                        p2_ids = set()
+                        
+                        if hasattr(player1, "vehicles"):
+                            if isinstance(player1.vehicles, dict):
+                                p1_ids = set(player1.vehicles.keys())
+                            else:
+                                p1_ids = {getattr(v, "id", None) for v in player1.vehicles if hasattr(v, "id")}
+                        
+                        if hasattr(player2, "vehicles"):
+                            if isinstance(player2.vehicles, dict):
+                                p2_ids = set(player2.vehicles.keys())
+                            else:
+                                p2_ids = {getattr(v, "id", None) for v in player2.vehicles if hasattr(v, "id")}
+                        
+                        # Verificar si ambos vehículos pertenecen al mismo equipo
+                        moving_in_p1 = moving_vehicle_id in p1_ids
+                        moving_in_p2 = moving_vehicle_id in p2_ids
+                        existing_in_p1 = existing_vehicle_id in p1_ids
+                        existing_in_p2 = existing_vehicle_id in p2_ids
+                        
+                        same_team = (moving_in_p1 and existing_in_p1) or (moving_in_p2 and existing_in_p2)
                     
-                    if veh_obj and hasattr(veh_obj, "status"):
-                        veh_obj.status = "destroyed"
-                        veh_obj.collected_value = 0
-                    
-                    # Limpiar el nodo
-                    # Preservar el estado de la base si estaba en una base
-                    if node.state in ("base_p1", "base_p2"):
-                        # Mantener el estado de la base pero limpiar el contenido del vehículo
-                        node.content = {}
-                        return False  # No permitir el movimiento
+                    if same_team:
+                        # Vehículos del mismo equipo: no permitir el movimiento, no destruir
+                        return False
                     else:
-                        node.state = "empty"
-                        node.content = {}
-                        return False  # No permitir el movimiento
+                        # Vehículos de equipos diferentes: destruir ambos
+                        if existing_vehicle_obj and hasattr(existing_vehicle_obj, "status"):
+                            existing_vehicle_obj.status = "destroyed"
+                            existing_vehicle_obj.collected_value = 0
+                        
+                        if veh_obj and hasattr(veh_obj, "status"):
+                            veh_obj.status = "destroyed"
+                            veh_obj.collected_value = 0
+                        
+                        # Limpiar el nodo
+                        # Preservar el estado de la base si estaba en una base
+                        if node.state in ("base_p1", "base_p2"):
+                            # Mantener el estado de la base pero limpiar el contenido del vehículo
+                            node.content = {}
+                            return False  # No permitir el movimiento
+                        else:
+                            node.state = "empty"
+                            node.content = {}
+                            return False  # No permitir el movimiento
         
         # Guardar el estado original de la base si existe
         original_base_state = None
