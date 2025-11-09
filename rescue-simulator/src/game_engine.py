@@ -185,6 +185,7 @@ class GameEngine:
 
     def start_game(self):
         self.state = "running"
+        #self.state = "game_over"
         self.start_time = time.time()  # Reiniciar tiempo al iniciar
         self.add_debug_event('system', "▶️ Simulación iniciada", (100, 255, 100))
 

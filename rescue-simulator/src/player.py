@@ -104,10 +104,12 @@ class Player:
         return self.vehicles.get(vehicle_id)
     
     def drawPlayerBase(self, surface, x, y):
+        root_path = Path(__file__).resolve().parents[1]  # sube de src/ a rescue-simulator/
+        font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
+
         if not hasattr(self, '_font'):
-            root_path = Path(__file__).resolve().parents[1]  # sube de src/ a rescue-simulator/
-            font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
             self._font = pygame.font.Font(str(font_path), 14)
+        statusFont = pygame.font.Font(str(font_path), 11)
         
         font = self._font
 
@@ -139,7 +141,7 @@ class Player:
                 rect = pygame.Rect(x+20, margin, 64, 64)
                 pygame.draw.rect(surface, vehicle.color, rect)
 
-            key_text = font.render(f"{key}, {vehicle.status}", True, PALETTE_1)
+            key_text = statusFont.render(f"{key}, {vehicle.status}", True, PALETTE_1)
             surface.blit(key_text, (x+95, margin))
 
             margin += 45

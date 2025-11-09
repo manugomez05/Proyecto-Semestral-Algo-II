@@ -16,7 +16,7 @@ import pygame
 import time
 from pathlib import Path
 
-from src import PALETTE_6
+from src import PALETTE_6, PALETTE_1, PALETTE_2, PALETTE_3, PALETTE_4, PALETTE_5
 
 
 
@@ -257,94 +257,127 @@ class Visualization:
             pass  # Si hay error, no mostrar información
 
     def drawGameOverScreen(self):
-        """Dibuja la pantalla de fin de juego con el ganador y estadísticas"""
+        """Dibuja la pantalla de fin de juego:
+        - EMPATE: muestra ambos jugadores lado a lado.
+        - GANADOR único: muestra solo la info del ganador, centrada.
+        """
         if not self.engine.game_over_info:
             return
-        
+
         info = self.engine.game_over_info
         screen_width, screen_height = self.screen.get_size()
-        
+
         # Fondo semi-transparente oscuro
         overlay = pygame.Surface((screen_width, screen_height))
         overlay.set_alpha(220)
         overlay.fill((15, 20, 35))
         self.screen.blit(overlay, (0, 0))
-        
-        # Fuentes
+
+        # Intentar cargar la fuente Press_Start_2P desde assets; fallback a fuente por defecto
         try:
-            title_font = pygame.font.Font(None, 80)
-            header_font = pygame.font.Font(None, 50)
-            info_font = pygame.font.Font(None, 36)
-            small_font = pygame.font.Font(None, 28)
-        except:
-            title_font = pygame.font.Font(None, 80)
-            header_font = pygame.font.Font(None, 50)
-            info_font = pygame.font.Font(None, 36)
-            small_font = pygame.font.Font(None, 28)
-        
+            root_path = Path(__file__).resolve().parents[1]
+            font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
+            title_font = pygame.font.Font(str(font_path), 50)
+            header_font = pygame.font.Font(str(font_path), 38)
+            info_font = pygame.font.Font(str(font_path), 24)
+            small_font = pygame.font.Font(str(font_path), 14)
+        except Exception:
+            title_font = pygame.font.Font(None, 50)
+            header_font = pygame.font.Font(None, 38)
+            info_font = pygame.font.Font(None, 24)
+            small_font = pygame.font.Font(None, 14)
+
         y_offset = 50
-        
+
         # Título "FIN DEL JUEGO"
         title = title_font.render("FIN DEL JUEGO", True, (255, 255, 100))
         title_rect = title.get_rect(center=(screen_width // 2, y_offset))
         self.screen.blit(title, title_rect)
         y_offset += 100
-        
+
         # Razón del fin del juego
-        reason_text = small_font.render(info["reason"], True, (200, 200, 200))
+        reason_text = small_font.render(info.get("reason", ""), True, PALETTE_3)
         reason_rect = reason_text.get_rect(center=(screen_width // 2, y_offset))
         self.screen.blit(reason_text, reason_rect)
         y_offset += 60
-        
+
         # Anuncio del ganador
         winner_colors = {
             "blue": (100, 150, 255),
             "red": (255, 100, 100),
             "gray": (150, 150, 150)
         }
-        winner_color = winner_colors.get(info["winner_color"], (255, 255, 255))
-        
-        if info["winner"] == "Empate":
+        winner_color = winner_colors.get(info.get("winner_color"), (255, 255, 255))
+
+        if info.get("winner") == "Empate":
             winner_text = header_font.render("¡EMPATE!", True, winner_color)
         else:
-            winner_text = header_font.render(f"¡GANADOR: {info['winner'].upper()}!", True, winner_color)
-        
+            winner_text = header_font.render(f"¡GANADOR: {str(info.get('winner','')).upper()}!", True, winner_color)
+
         winner_rect = winner_text.get_rect(center=(screen_width // 2, y_offset))
         self.screen.blit(winner_text, winner_rect)
         y_offset += 80
-        
-        # Dividir pantalla en dos columnas para cada jugador
-        col_width = screen_width // 2
-        
-        # Información del Jugador 1
-        self._draw_player_stats(
-            info["player1"],
-            50,
-            y_offset,
-            col_width - 100,
-            info_font,
-            small_font,
-            (100, 150, 255)
-        )
-        
-        # Información del Jugador 2
-        self._draw_player_stats(
-            info["player2"],
-            screen_width // 2 + 50,
-            y_offset,
-            col_width - 100,
-            info_font,
-            small_font,
-            (255, 100, 100)
-        )
-        
+
+        # ancho estimado para el bloque de estadísticas
+        stats_width = min(460, max(300, screen_width // 3))
+
+        if info.get("winner") == "Empate":
+            # Mostrar ambos jugadores lado a lado
+            left_x = screen_width // 4 - stats_width // 2
+            right_x = 3 * screen_width // 4 - stats_width // 2
+
+            self._draw_player_stats(
+                info.get("player1", {}),
+                left_x,
+                y_offset,
+                stats_width,
+                info_font,
+                small_font,
+                (100, 150, 255)
+            )
+
+            self._draw_player_stats(
+                info.get("player2", {}),
+                right_x,
+                y_offset,
+                stats_width,
+                info_font,
+                small_font,
+                (255, 100, 100)
+            )
+        else:
+            # Mostrar sólo la info del ganador, centrada
+            winner_name = info.get("winner")
+            p1 = info.get("player1", {})
+            p2 = info.get("player2", {})
+
+            if p1.get("name") == winner_name:
+                winner_info = p1
+            elif p2.get("name") == winner_name:
+                winner_info = p2
+            else:
+                # Si no coincide el nombre, intentar inferir por puntaje mayor
+                winner_info = p1 if p1.get("score", 0) >= p2.get("score", 0) else p2
+
+            center_x = screen_width // 2 - stats_width // 2 + 100
+            if winner_info:
+                self._draw_player_stats(
+                    winner_info,
+                    center_x,
+                    y_offset,
+                    stats_width,
+                    info_font,
+                    small_font,
+                    winner_color
+                )
+
         # Instrucción para reiniciar
-        y_offset = screen_height - 80
-        restart_text = small_font.render("Presiona el botón INIT para jugar de nuevo", True, (200, 200, 200))
+        y_offset = screen_height - 100
+        restart_text = small_font.render("Presiona el botón INIT para jugar de nuevo", True, PALETTE_3)
         restart_rect = restart_text.get_rect(center=(screen_width // 2, y_offset))
         self.screen.blit(restart_text, restart_rect)
-        
-        # Dibujar el botón INIT para que sea visible
+
+        # Dibujar los botones (visibles)
         for b in self.buttons:
             b.draw(self.screen)
     
@@ -358,7 +391,7 @@ class Visualization:
         y_offset += 50
         
         # Puntuación
-        score_text = info_font.render(f"Puntos: {player_info['score']}", True, (255, 255, 255))
+        score_text = info_font.render(f"Puntos: {player_info['score']}", True, PALETTE_1)
         self.screen.blit(score_text, (x, y_offset))
         y_offset += 60
         
