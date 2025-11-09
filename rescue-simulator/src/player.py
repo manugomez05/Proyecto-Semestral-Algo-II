@@ -38,7 +38,9 @@ class Player:
         Crea la flota inicial del jugador según las especificaciones del proyecto.
         """
         vm = VehicleManager()
-        vm.create_default_fleet()
+        # Determinar qué jugador es (1 o 2) según el nombre
+        player_num = 1 if self.name == "Jugador_1" else 2
+        vm.create_default_fleet(player_num)
 
         return vm.all_vehicles()
 
@@ -118,13 +120,27 @@ class Player:
         pygame.draw.line(surface, PALETTE_1, (x, 200), (x, 650), 2)
 
         for key, vehicle in self.vehicles.items():
-
-            rect = pygame.Rect(x+20, margin, 16, 16)
-            pygame.draw.rect(surface, vehicle.color, rect)
+            # Dibujar imagen del vehículo en lugar del color
+            img_path = getattr(vehicle, "img_path", None)
+            if img_path:
+                try:
+                    img = pygame.image.load(img_path).convert_alpha()
+                    img = pygame.transform.scale(img, (64, 64))  # Tamaño el doble de grande
+                    # Cada jugador tiene sus propias imágenes que ya apuntan hacia el centro
+                    # Jugador_1: usa *1.png (apuntan a la derecha →)
+                    # Jugador_2: usa *2.png (apuntan a la izquierda ←)
+                    surface.blit(img, (x+20, margin-16))
+                except:
+                    # Fallback: dibujar rectángulo con color si hay error
+                    rect = pygame.Rect(x+20, margin, 64, 64)
+                    pygame.draw.rect(surface, vehicle.color, rect)
+            else:
+                # Fallback: dibujar rectángulo con color
+                rect = pygame.Rect(x+20, margin, 64, 64)
+                pygame.draw.rect(surface, vehicle.color, rect)
 
             key_text = font.render(f"{key}, {vehicle.status}", True, PALETTE_1)
-
-            surface.blit(key_text, (x+50, margin))
+            surface.blit(key_text, (x+95, margin))
 
             margin += 45
 

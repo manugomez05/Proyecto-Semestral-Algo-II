@@ -107,21 +107,37 @@ class Visualization:
                     vehicle_obj = None
                     if isinstance(v, dict):
                         vehicle_obj = v.get("object")
-                        v_type = v.get("type")
-                        color = v.get("color")
                     else:
                         vehicle_obj = v
-                        v_type = getattr(v, "type", None)
-                        color = getattr(v, "color", None)
                     
                     # Verificar que el vehículo no esté destruido
                     if vehicle_obj:
                         status = getattr(vehicle_obj, "status", None)
                         if status == "destroyed":
                             continue  # No dibujar vehículos destruidos
-                    
-                    # Dibujar el vehículo
-                    pygame.draw.circle(self.screen, color, rect.center, 6)
+                        
+                        # Obtener la ruta de imagen del vehículo
+                        img_path = getattr(vehicle_obj, "img_path", None)
+                        if img_path:
+                            # Cargar y renderizar la imagen del vehículo con tamaño aumentado
+                            VEHICLE_SCALE = 2.5  # Factor de escala para hacer vehículos más grandes
+                            vehicle_size = int(CELL_SIZE * VEHICLE_SCALE)
+                            img = pygame.image.load(img_path).convert_alpha()
+                            img = pygame.transform.scale(img, (vehicle_size, vehicle_size))
+                            
+                            # Cada jugador ya tiene sus propias imágenes que apuntan hacia el centro
+                            # Jugador_1: usa *1.png (apuntan a la derecha →)
+                            # Jugador_2: usa *2.png (apuntan a la izquierda ←)
+                            # No es necesario voltear las imágenes
+                            
+                            # Centrar la imagen más grande en la celda
+                            offset_x = x - (vehicle_size - CELL_SIZE) // 2
+                            offset_y = y - (vehicle_size - CELL_SIZE) // 2
+                            self.screen.blit(img, (offset_x, offset_y))
+                        else:
+                            # Fallback: dibujar círculo si no hay imagen
+                            color = getattr(vehicle_obj, "color", (255, 255, 255))
+                            pygame.draw.circle(self.screen, color, rect.center, 6)
 
                 pygame.draw.rect(self.screen, PALETTE_6, rect, 1)
 

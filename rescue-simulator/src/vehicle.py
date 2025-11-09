@@ -1,10 +1,30 @@
 from dataclasses import dataclass, field
 from typing import Tuple, List, Dict, Optional
+from pathlib import Path
 
 TRUCK_COLOR = (30, 144, 255)
 JEEP_COLOR = (34, 139, 34)
 CAR_COLOR = (240, 240, 240)
 MOTORCYCLE_COLOR = (255, 140, 0)
+
+# Rutas a las imágenes de vehículos
+base_path = Path(__file__).resolve().parent
+assets_path = base_path.parent / 'assets'
+
+# Imágenes específicas para cada jugador
+VEHICLE_IMAGES_PLAYER1 = {
+    "jeep": str(assets_path / 'jeep1.png'),
+    "moto": str(assets_path / 'motorcycle1.png'),
+    "camion": str(assets_path / 'truck1.png'),
+    "auto": str(assets_path / 'car1.png'),
+}
+
+VEHICLE_IMAGES_PLAYER2 = {
+    "jeep": str(assets_path / 'jeep2.png'),
+    "moto": str(assets_path / 'motorcycle2.png'),
+    "camion": str(assets_path / 'truck2.png'),
+    "auto": str(assets_path / 'car2.png'),
+}
 
 @dataclass
 class Vehicle:
@@ -38,6 +58,8 @@ class Vehicle:
     target: Optional[object] = None
     # Posición específica en la base (donde sale y debe volver)
     base_position: Optional[Tuple[int, int]] = None
+    # Ruta de imagen del vehículo
+    img_path: str = ""
 
     def move_to(self, row: int, col: int):
         self.position = (row, col)
@@ -171,14 +193,19 @@ class VehicleManager:
         if vehicle_id in self.vehicles:
             del self.vehicles[vehicle_id]
 
-    def create_default_fleet(self):
+    def create_default_fleet(self, player_num=1):
         """Crea la flota según las especificaciones del proyecto:
 
         - 3 Jeeps: todo tipo de carga, hasta 2 viajes sin volver
         - 2 Motos: solo personas, deben volver tras recoger persona
         - 2 Camiones: todo tipo de carga, hasta 3 viajes sin volver
         - 3 Autos: personas y cargas; si recogen carga deben volver a base
+        
+        :param player_num: 1 para Jugador_1 (usa imágenes *1.png), 2 para Jugador_2 (usa imágenes *2.png)
         """
+        # Seleccionar el conjunto de imágenes según el jugador
+        vehicle_images = VEHICLE_IMAGES_PLAYER1 if player_num == 1 else VEHICLE_IMAGES_PLAYER2
+        
         # 3 Jeeps
         for i in range(1, 4):
             v = Vehicle(
@@ -189,6 +216,7 @@ class VehicleManager:
                 allowed_load=["people", "cargo"],
                 max_consecutive_trips=2,
                 must_return_on_cargo=False,
+                img_path=vehicle_images["jeep"],
             )
             self.add_vehicle(v)
 
@@ -202,6 +230,7 @@ class VehicleManager:
                 allowed_load=["people"],
                 max_consecutive_trips=1,
                 must_return_on_cargo=True,  # irrelevant pero mantener coherencia
+                img_path=vehicle_images["moto"],
             )
             self.add_vehicle(v)
 
@@ -215,6 +244,7 @@ class VehicleManager:
                 allowed_load=["people", "cargo"],
                 max_consecutive_trips=3,
                 must_return_on_cargo=False,
+                img_path=vehicle_images["camion"],
             )
             self.add_vehicle(v)
 
@@ -228,6 +258,7 @@ class VehicleManager:
                 allowed_load=["people", "cargo"],
                 max_consecutive_trips=1,
                 must_return_on_cargo=True,
+                img_path=vehicle_images["auto"],
             )
             self.add_vehicle(v)
 

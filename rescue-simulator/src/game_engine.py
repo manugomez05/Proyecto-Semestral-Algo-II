@@ -110,12 +110,10 @@ class GameEngine:
                 # Colocar vehículo en la base usando place_vehicle
                 try:
                     self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
-                    print(f"[INIT] {vehicle_id} colocado en ({base_row}, {base_col})")
                 except Exception as e:
                     # Fallback: actualizar posición directamente
                     vehicle.position = (base_row, base_col)
                     vehicle.status = "in_base"
-                    print(f"[INIT ERROR] {vehicle_id} error al colocar en ({base_row}, {base_col}): {e}")
                 vehicle_index += 1
         
         # Colocar vehículos de player2 en su base y asignar posición específica
@@ -139,22 +137,18 @@ class GameEngine:
                 # Colocar vehículo en la base usando place_vehicle
                 try:
                     self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
-                    print(f"[INIT] {vehicle_id} colocado en ({base_row}, {base_col})")
                 except Exception as e:
                     # Fallback: actualizar posición directamente
                     vehicle.position = (base_row, base_col)
                     vehicle.status = "in_base"
-                    print(f"[INIT ERROR] {vehicle_id} error al colocar en ({base_row}, {base_col}): {e}")
                 vehicle_index += 1
 
     def start_game(self):
-        print("Simulación iniciada")
         self.state = "running"
         
         self.start_time = time.time()  # Reiniciar tiempo al iniciar
 
     def stop_game(self):
-        print("Simulación detenida")
         self.state = "stopped"
 
     def save_state(self):
@@ -314,7 +308,6 @@ class GameEngine:
                         # Verificar si la posición actual del vehículo está minada
                         if self.map.mine_manager.isCellMined((row, col), self.tick):
                             vehicle_id = getattr(vehicle_obj, "id", "unknown")
-                            print(f"[MINE EXPLOSION] Vehículo {vehicle_id} explotó en mina en posición ({row}, {col}) en tick {self.tick}")
                             vehicle_obj.status = "destroyed"
                             vehicle_obj.collected_value = 0
 
@@ -336,7 +329,6 @@ class GameEngine:
                         if vehicle_obj.status == "destroyed":
                             # Debug: reportar vehículo destruido
                             vehicle_id = getattr(vehicle_obj, "id", "unknown")
-                            print(f"[DESTROYED] Vehículo {vehicle_id} destruido en posición ({row}, {col})")
                             
                             # Limpiar el nodo
                             if node.state in ("base_p1", "base_p2"):
