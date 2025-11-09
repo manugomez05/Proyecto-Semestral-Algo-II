@@ -334,14 +334,14 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
                             # Dibuja un borde para mantener la cuadrícula visible
                             pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
-        # Dibujo para banda horizontal (T1) - TEMPORAL: mostrar línea horizontal
+        # Dibujo para banda horizontal (T1) - Línea horizontal de 1 fila
         elif mine.type is MineType.T1:
-            # Limita la extensión horizontal de la banda
-            band_length = min(15, cols // 3)  # Máximo 15 celdas o 1/3 del ancho del mapa
-            start_col = max(0, mine_col - band_length // 2)
-            end_col = min(cols - 1, mine_col + band_length // 2)
+            # Extensión horizontal: ±7 celdas desde el centro
+            band_half_length = 7  # Debe coincidir con la lógica en mines.py
+            start_col = max(0, mine_col - band_half_length)
+            end_col = min(cols - 1, mine_col + band_half_length)
             
-            # Solo dibuja la línea horizontal (no rectángulo)
+            # Solo dibuja la línea horizontal (1 fila)
             for current_col in range(start_col, end_col + 1):
                 x, y = cellToPx(mine_row, current_col)
                 rect = pygame.Rect(x, y, cell_size, cell_size)
@@ -354,14 +354,14 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
                 
                 pygame.draw.rect(surface, (0, 0, 0), rect, 1)
 
-        # Dibujo para banda vertical (T2) - TEMPORAL: mostrar línea vertical
+        # Dibujo para banda vertical (T2) - Línea vertical de 1 columna
         elif mine.type is MineType.T2:
-            # Limita la extensión vertical de la banda
-            band_length = min(15, rows // 3)  # Máximo 15 celdas o 1/3 del alto del mapa
-            start_row = max(0, mine_row - band_length // 2)
-            end_row = min(rows - 1, mine_row + band_length // 2)
+            # Extensión vertical: ±5 celdas desde el centro
+            band_half_length = 5  # Debe coincidir con la lógica en mines.py
+            start_row = max(0, mine_row - band_half_length)
+            end_row = min(rows - 1, mine_row + band_half_length)
             
-            # Solo dibuja la línea vertical (no rectángulo)
+            # Solo dibuja la línea vertical (1 columna)
             for current_row in range(start_row, end_row + 1):
                 x, y = cellToPx(current_row, mine_col)
                 rect = pygame.Rect(x, y, cell_size, cell_size)

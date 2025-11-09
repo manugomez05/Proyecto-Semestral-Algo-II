@@ -60,11 +60,12 @@ class GameEngine:
 
         # Asignar estrategias a los jugadores
         try:
-            # Estrategia 1 para player1: motos destruyen camiones, resto usa Greedy
+            # Estrategia 1 para player1: motos destruyen camiones, resto usa BFS
             self.player1.strategy = Strategy1(self.map.cols, self.map.rows, self.map, self.player2)
             
-            # Estrategia 2 para player2: Dijkstra para recursos, motos destruyen camiones
-            self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
+            # Estrategia 2 para player2: DESHABILITADA temporalmente
+            # self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
+            self.player2.strategy = None
         except Exception as e:
             print(f"Error al asignar estrategias: {e}")
             self.player1.strategy = None
@@ -90,34 +91,60 @@ class GameEngine:
         
         # Colocar vehículos de player1 en su base y asignar posición específica
         vehicle_index = 0
+        used_positions = set()  # Para evitar superposiciones
         for vehicle_id, vehicle in self.player1.vehicles.items():
             if vehicle_index < len(p1_base_cells):
                 base_row, base_col = p1_base_cells[vehicle_index]
+                
+                # Verificar que la posición no esté ocupada
+                while (base_row, base_col) in used_positions and vehicle_index < len(p1_base_cells) - 1:
+                    vehicle_index += 1
+                    base_row, base_col = p1_base_cells[vehicle_index]
+                
+                used_positions.add((base_row, base_col))
+                
                 # Asignar posición específica de base al vehículo
                 vehicle.base_position = (base_row, base_col)
+                # Asegurar que el vehículo esté en estado "in_base" antes de colocarlo
+                vehicle.status = "in_base"
                 # Colocar vehículo en la base usando place_vehicle
                 try:
                     self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
-                except Exception:
+                    print(f"[INIT] {vehicle_id} colocado en ({base_row}, {base_col})")
+                except Exception as e:
                     # Fallback: actualizar posición directamente
                     vehicle.position = (base_row, base_col)
                     vehicle.status = "in_base"
+                    print(f"[INIT ERROR] {vehicle_id} error al colocar en ({base_row}, {base_col}): {e}")
                 vehicle_index += 1
         
         # Colocar vehículos de player2 en su base y asignar posición específica
         vehicle_index = 0
+        used_positions_p2 = set()  # Para evitar superposiciones
         for vehicle_id, vehicle in self.player2.vehicles.items():
             if vehicle_index < len(p2_base_cells):
                 base_row, base_col = p2_base_cells[vehicle_index]
+                
+                # Verificar que la posición no esté ocupada
+                while (base_row, base_col) in used_positions_p2 and vehicle_index < len(p2_base_cells) - 1:
+                    vehicle_index += 1
+                    base_row, base_col = p2_base_cells[vehicle_index]
+                
+                used_positions_p2.add((base_row, base_col))
+                
                 # Asignar posición específica de base al vehículo
                 vehicle.base_position = (base_row, base_col)
+                # Asegurar que el vehículo esté en estado "in_base" antes de colocarlo
+                vehicle.status = "in_base"
                 # Colocar vehículo en la base usando place_vehicle
                 try:
                     self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
-                except Exception:
+                    print(f"[INIT] {vehicle_id} colocado en ({base_row}, {base_col})")
+                except Exception as e:
                     # Fallback: actualizar posición directamente
                     vehicle.position = (base_row, base_col)
                     vehicle.status = "in_base"
+                    print(f"[INIT ERROR] {vehicle_id} error al colocar en ({base_row}, {base_col}): {e}")
                 vehicle_index += 1
 
     def start_game(self):
@@ -258,12 +285,13 @@ class GameEngine:
                 print(f"Error al ejecutar estrategia player1: {e}")
         
         # Mover vehículos del jugador 2 usando su estrategia si está presente
-        strategy2 = getattr(self.player2, "strategy", None)
-        if strategy2 is not None and callable(getattr(strategy2, "update", None)):
-            try:
-                strategy2.update(self.player2)
-            except Exception as e:
-                print(f"Error al ejecutar estrategia player2: {e}")
+        # DESHABILITADO temporalmente
+        # strategy2 = getattr(self.player2, "strategy", None)
+        # if strategy2 is not None and callable(getattr(strategy2, "update", None)):
+        #     try:
+        #         strategy2.update(self.player2)
+        #     except Exception as e:
+        #         print(f"Error al ejecutar estrategia player2: {e}")
     
     def _cleanup_destroyed_vehicles(self):
         """Limpia los vehículos destruidos del mapa"""
@@ -281,6 +309,10 @@ class GameEngine:
                     
                     if vehicle_obj and hasattr(vehicle_obj, "status"):
                         if vehicle_obj.status == "destroyed":
+                            # Debug: reportar vehículo destruido
+                            vehicle_id = getattr(vehicle_obj, "id", "unknown")
+                            print(f"[DESTROYED] Vehículo {vehicle_id} destruido en posición ({row}, {col})")
+                            
                             # Limpiar el nodo
                             if node.state in ("base_p1", "base_p2"):
                                 # Restaurar estado de base sin vehículo

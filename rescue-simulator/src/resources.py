@@ -52,8 +52,6 @@ def get_random_free_position(map_width, map_height, used_positions, mine_manager
             if mine_manager is None or is_position_safe_from_mines(x, y, mine_manager, tick):
                 used_positions.add((x, y))
                 return (x, y)
-            else:
-                print(f"DEBUG: Posición ({x}, {y}) no es segura por minas")
         attempts += 1
     
     # Si no se encuentra posición segura, usar la primera disponible

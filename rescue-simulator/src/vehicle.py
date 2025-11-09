@@ -50,6 +50,19 @@ class Vehicle:
         self.status = "in_base"
         self.trips_done_since_base = 0
         self.collected_value = 0
+        # Resetear capacidad según el tipo de vehículo
+        vehicle_type = getattr(self, "type", None)
+        if vehicle_type == "jeep":
+            self.capacity = 4
+        elif vehicle_type == "moto":
+            self.capacity = 1
+        elif vehicle_type == "camion":
+            self.capacity = 10
+        elif vehicle_type == "auto":
+            self.capacity = 4
+        else:
+            # Fallback: restaurar a un valor por defecto si no se conoce el tipo
+            self.capacity = 4
 
     def start_trip(self):
         self.status = "moving"
@@ -102,7 +115,7 @@ class Vehicle:
         self.capacity -= 1
 
         if self.capacity <= 0:
-            print("ENTRO CAPACIDAD")
+            # print("ENTRO CAPACIDAD")
             self.status = "need_return"
 
         # no sobrepasar la capacidad física; si se alcanza, forzar regreso

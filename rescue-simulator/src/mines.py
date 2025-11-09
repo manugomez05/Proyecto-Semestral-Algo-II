@@ -76,12 +76,16 @@ class Mine:
             dr, dc = r-r0, c-c0
             return (dr * dr + dc * dc) <= (self.radius * self.radius)
 
-        # Verificación para bandas
+        # Verificación para bandas (líneas finas)
         if self.type is MineType.T1:
-            return abs(r-r0) <= self.half_width
+            # Banda horizontal: 1 fila × 15 columnas (±7 desde el centro)
+            band_half_length = 7  # Se extiende 7 celdas a cada lado del centro
+            return r == r0 and abs(c-c0) <= band_half_length
         if self.type is MineType.T2:
-            return abs(c-c0) <= self.half_width
-
-        return False 
+            # Banda vertical: 11 filas (±5 desde el centro) × 1 columna
+            band_half_length = 5  # Se extiende 5 celdas arriba y abajo del centro
+            return c == c0 and abs(r-r0) <= band_half_length
+        
+        return False
 
 

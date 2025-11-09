@@ -82,8 +82,8 @@ class MapManager:
         mine_spec = {
             MineType.O1: 2,  # 2 minas circulares grandes
             MineType.O2: 3,   # 3 minas circulares pequeñas
-            MineType.T1: 2,   # 2 bandas horizontales
-            MineType.T2: 2,   # 2 bandas verticales
+            MineType.T1: 2,   # 2 bandas horizontales (ahora limitadas a 15 celdas)
+            MineType.T2: 2,   # 2 bandas verticales (ahora limitadas a 15 celdas)
             MineType.G1: 1    # 1 mina dinámica
         }
         
