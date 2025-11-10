@@ -1,17 +1,23 @@
 """
 Gestor de minas para el simulador de rescate.
 Maneja la colección de minas, verificación de superposiciones y generación aleatoria.
+Optimizado con hash tables para búsqueda eficiente O(1).
 """
 from __future__ import annotations
-from typing import List
+from typing import List, Dict, TYPE_CHECKING
 import random
 from src.mines import *
-from src.map_graph import *
 from src import PALETTE_5, PALETTE_4
+
+# Evitar importación circular
+if TYPE_CHECKING:
+    from src.map_graph import MapGraph
 # Gestor principal de minas del simulador
 class MineManager: 
     def __init__(self) -> None:
-        self.mines: List[Mine] = []  # Colección de minas
+        self.mines: List[Mine] = []  # Colección de minas (mantener para compatibilidad)
+        self.mines_by_id: Dict[int, Mine] = {}  # Hash table: ID -> Mine (O(1) lookup)
+        self.mined_cells_cache: Dict[Cell, List[int]] = {}  # Hash table espacial: Cell -> [mine_ids]
         self.next_id: int = 1  # Contador de IDs
 
     def addMine(self, type: MineType, center: Cell) -> Mine:
@@ -29,17 +35,87 @@ class MineManager:
             active=True,
             next_activation=period  # Próxima activación en period ticks
         )
+        mine_id = self.next_id
         self.next_id += 1
+        
+        # Agregar a ambas estructuras
         self.mines.append(mine)
-        return mine 
+        self.mines_by_id[mine_id] = mine  # Hash table O(1)
+        
+        # Actualizar cache espacial: precalcular todas las celdas afectadas
+        self._update_spatial_cache_for_mine(mine)
+        
+        return mine
+    
+    def _update_spatial_cache_for_mine(self, mine: Mine, rows: int = 50, cols: int = 50) -> None:
+        """Actualiza el cache espacial para una mina específica.
+        Precalcula todas las celdas que esta mina puede afectar.
+        """
+        # Determinar el área de búsqueda según el tipo de mina
+        r0, c0 = mine.center
+        
+        if mine.type in (MineType.O1, MineType.O2, MineType.G1):
+            # Minas circulares: buscar en un cuadrado alrededor del centro
+            radius = mine.radius
+            for r in range(max(0, r0 - radius), min(rows, r0 + radius + 1)):
+                for c in range(max(0, c0 - radius), min(cols, c0 + radius + 1)):
+                    if mine.contains((r, c), tick=0):
+                        cell = (r, c)
+                        if cell not in self.mined_cells_cache:
+                            self.mined_cells_cache[cell] = []
+                        if mine.id not in self.mined_cells_cache[cell]:
+                            self.mined_cells_cache[cell].append(mine.id)
+        
+        elif mine.type == MineType.T1:
+            # Banda horizontal
+            band_half_length = 7
+            for c in range(max(0, c0 - band_half_length), min(cols, c0 + band_half_length + 1)):
+                cell = (r0, c)
+                if cell not in self.mined_cells_cache:
+                    self.mined_cells_cache[cell] = []
+                if mine.id not in self.mined_cells_cache[cell]:
+                    self.mined_cells_cache[cell].append(mine.id)
+        
+        elif mine.type == MineType.T2:
+            # Banda vertical
+            band_half_length = 5
+            for r in range(max(0, r0 - band_half_length), min(rows, r0 + band_half_length + 1)):
+                cell = (r, c0)
+                if cell not in self.mined_cells_cache:
+                    self.mined_cells_cache[cell] = []
+                if mine.id not in self.mined_cells_cache[cell]:
+                    self.mined_cells_cache[cell].append(mine.id) 
     
     def removeMine(self, mine_id: int) -> bool:
-        """Elimina una mina por su ID"""
-        for i, m in enumerate(self.mines):
-            if m.id == mine_id:
-                self.mines.pop(i)
-                return True 
-        return False 
+        """Elimina una mina por su ID (optimizado con hash table - O(1))"""
+        # Buscar en hash table O(1) en lugar de búsqueda lineal O(n)
+        mine = self.mines_by_id.get(mine_id)
+        if mine is None:
+            return False
+        
+        # Eliminar de hash table
+        del self.mines_by_id[mine_id]
+        
+        # Eliminar de lista (mantener compatibilidad)
+        self.mines.remove(mine)
+        
+        # Limpiar cache espacial para esta mina
+        self._remove_from_spatial_cache(mine)
+        
+        return True
+    
+    def _remove_from_spatial_cache(self, mine: Mine) -> None:
+        """Elimina una mina del cache espacial."""
+        cells_to_clean = []
+        for cell, mine_ids in self.mined_cells_cache.items():
+            if mine.id in mine_ids:
+                mine_ids.remove(mine.id)
+                if not mine_ids:  # Si la lista queda vacía, marcar para eliminar
+                    cells_to_clean.append(cell)
+        
+        # Eliminar celdas vacías del cache
+        for cell in cells_to_clean:
+            del self.mined_cells_cache[cell] 
 
     def updateAll(self, tick: int, rows: int = 50, cols: int = 50, elapsed_time: float = 0, map_manager=None) -> None:
         """Actualiza todas las minas dinámicas"""
@@ -53,15 +129,29 @@ class MineManager:
                     m.update(tick)
 
     def isCellMined(self, cell: Cell, tick: int) -> bool:
-        """Verifica si una celda está afectada por alguna mina"""
-        for m in self.mines:
-            if m.contains(cell, tick):
+        """Verifica si una celda está afectada por alguna mina (optimizado con hash table espacial - O(1) amortizado)"""
+        # Usar cache espacial: O(1) lookup en lugar de O(n) iteración
+        mine_ids = self.mined_cells_cache.get(cell, [])
+        if not mine_ids:
+            return False
+        
+        # Verificar si alguna de las minas que afectan esta celda está activa en este tick
+        for mine_id in mine_ids:
+            mine = self.mines_by_id.get(mine_id)
+            if mine and mine.contains(cell, tick):
                 return True
         return False
 
     def minesAffecting(self, cell: Cell, tick: int) -> List[Mine]:
-        """Obtiene todas las minas que afectan una celda"""
-        return [m for m in self.mines if m.contains(cell, tick)]
+        """Obtiene todas las minas que afectan una celda (optimizado con hash table espacial)"""
+        # Usar cache espacial: O(k) donde k es el número de minas en esa celda (típicamente k << n)
+        mine_ids = self.mined_cells_cache.get(cell, [])
+        result = []
+        for mine_id in mine_ids:
+            mine = self.mines_by_id.get(mine_id)
+            if mine and mine.contains(cell, tick):
+                result.append(mine)
+        return result
 
     def all(self) -> List[Mine]:
         """Retorna todas las minas del simulador"""
@@ -201,11 +291,20 @@ class MineManager:
                 if safe_position:
                     # Mover la mina a la nueva posición
                     old_pos = mine.center
+                    
+                    # Limpiar el cache espacial de la posición anterior
+                    self._remove_from_spatial_cache(mine)
+                    
+                    # Actualizar posición
                     mine.center = (new_row, new_col)
+                    
+                    # Actualizar cache espacial con la nueva posición
+                    self._update_spatial_cache_for_mine(mine, rows, cols)
+                    
                     #print(f"DEBUG: G1 movida de {old_pos} a {mine.center}")
                     break
 
-    def addRandomMine(self, type: MineType, rows: int, cols: int, margin: int = 0, max_attempts: int = 100, map_graph: MapGraph = None) -> Mine:
+    def addRandomMine(self, type: MineType, rows: int, cols: int, margin: int = 0, max_attempts: int = 100, map_graph: "MapGraph" = None) -> Mine:
         """Crea una mina en posición aleatoria sin superposición"""
         params = MINE_PARAMS[type]
         radius = params.get("radius", 0)
@@ -263,7 +362,7 @@ class MineManager:
         # Si no se encontró una posición válida, lanza una excepción
         raise RuntimeError(f"No se pudo encontrar una posición válida para la mina {type} después de {max_attempts} intentos")
 
-    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0, map_graph: MapGraph = None) -> None:
+    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0, map_graph: "MapGraph" = None) -> None:
         """Crea múltiples minas aleatorias según especificación"""
         for type_, count in spec.items():
             for _ in range(count):
@@ -486,7 +585,7 @@ def drawMines(surface, mines: MineManager, rows: int, cols: int, cell_size: int,
         # Si no se encontró una posición válida, lanza una excepción
         raise RuntimeError(f"No se pudo encontrar una posición válida para la mina {type} después de {max_attempts} intentos")
 
-    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0, map_graph: MapGraph = None) -> None:
+    def addRandomSet(self, rows: int, cols: int, spec: dict[MineType, int], margin: int = 0, map_graph: "MapGraph" = None) -> None:
         """Crea múltiples minas aleatorias según especificación"""
         for type_, count in spec.items():
             for _ in range(count):

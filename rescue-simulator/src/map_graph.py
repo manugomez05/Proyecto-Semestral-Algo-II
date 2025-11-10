@@ -10,11 +10,11 @@ Responsabilidades:
 - Crear y conectar nodos (vecinos adyacentes).
 - Proveer funciones de acceso y modificación de estado.
 - Servir como base de los algoritmos de búsqueda (pathfinding).
+
+Optimizado con hash tables para acceso O(1) a nodos, recursos y vehículos.
 """
 
-
-
-#clase responsable de crear el grafo que va a representar el mapa 2d del simulador, usando la clase node
+from typing import Dict, Tuple, List, Optional
 from src.node import Node
 from src.mines_manager import MineManager
 from src.mines import MineType
@@ -25,6 +25,15 @@ class MapGraph:
         self.rows = rows
         self.cols = cols
         self.grid = [] #matriz de nodos
+        
+        # Hash tables para acceso eficiente O(1)
+        self.nodes_by_position: Dict[Tuple[int, int], Node] = {}  # (row, col) -> Node
+        self.resources_by_position: Dict[Tuple[int, int], dict] = {}  # (row, col) -> resource_data
+        self.vehicles_by_position: Dict[Tuple[int, int], list] = {}  # (row, col) -> [vehicle_data]
+        
+        # Inicializar la cuadrícula y conexiones
+        self.__post_init_setup__()
+    
     def __getstate__(self):
         """Método especial para pickle"""
         return self.__dict__.copy()
@@ -46,20 +55,14 @@ class MapGraph:
             self.generate_nodes()
             self.connect_neighbors()
 
-    def __init__(self,rows,cols):
-        # Mantener compatibilidad con la firma original en caso de re-creación
-        self.rows = rows
-        self.cols = cols
-        self.grid = [] #matriz de nodos
-        # Inicializar la cuadrícula y conexiones
-        self.__post_init_setup__()
-
     def generate_nodes(self):
         for row in range(self.rows):
             row_nodes = []
             for col in range(self.cols):
                 node = Node(row,col)
                 row_nodes.append(node)
+                # Agregar a hash table para acceso O(1)
+                self.nodes_by_position[(row, col)] = node
             self.grid.append(row_nodes)
 
 
@@ -86,46 +89,90 @@ class MapGraph:
 
 
     def get_node(self, row, col):
-        #Devuelve el nodo en la posicion (row, col)
-        if 0 <= row < self.rows and 0 <= col < self.cols:
-            return self.grid[row][col]
-        return None
+        """Devuelve el nodo en la posicion (row, col) - Optimizado con hash table O(1)"""
+        # Usar hash table para acceso directo O(1) en lugar de acceso a array 2D
+        return self.nodes_by_position.get((row, col))
     
     def set_node_state(self, row, col, state, content = None):
-        #Modifica el estado y contenido de un nodo
+        """Modifica el estado y contenido de un nodo - Actualiza hash tables"""
         node = self.get_node(row,col)
         if node:
+            # Limpiar hash tables antiguas si cambia el estado
+            pos = (row, col)
+            if node.state == "resource" and pos in self.resources_by_position:
+                del self.resources_by_position[pos]
+            if node.state == "vehicle" and pos in self.vehicles_by_position:
+                del self.vehicles_by_position[pos]
+            
+            # Actualizar nodo
             node.state = state
             node.content = content if content else {}
             
+            # Actualizar hash tables según el nuevo estado
+            if state == "resource" and content:
+                self.resources_by_position[pos] = content
+            elif state == "vehicle" and content:
+                if pos not in self.vehicles_by_position:
+                    self.vehicles_by_position[pos] = []
+                # Si content es una lista, agregar todos; si es un solo vehículo, agregarlo
+                if isinstance(content, list):
+                    self.vehicles_by_position[pos] = content
+                else:
+                    self.vehicles_by_position[pos] = [content]
+            
     def all_resources(self):
         """
-        Devuelve una lista con los objetos/resources presentes en el mapa.
-        Si la lista original (self.resources) existe, la devuelve (copia).
-        Si no existe, reconstruye una lista a partir del contenido de los nodos.
+        Devuelve una lista con los objetos/resources presentes en el mapa (optimizado con hash table).
         """
         if hasattr(self, "resources") and self.resources is not None:
             return list(self.resources)
 
+        # Usar hash table de recursos para búsqueda O(1) en lugar de iterar toda la grilla O(n*m)
         recursos = []
-        for r in range(self.rows):
-            for c in range(self.cols):
-                node = self.get_node(r, c)
-                if node and getattr(node, "state", None) == "resource":
-                    content = getattr(node, "content", None)
-                    # Si el contenido almacena el objeto original bajo alguna clave:
-                    if isinstance(content, dict) and ("object" in content or "obj" in content):
-                        obj = content.get("object") or content.get("obj")
-                        recursos.append(obj)
-                    else:
-                        # devolver una representación mínima (incluye posición)
-                        if isinstance(content, dict):
-                            item = dict(content)
-                            item.setdefault("position", (r, c))
-                            recursos.append(item)
-                        else:
-                            recursos.append(content)
+        for pos, content in self.resources_by_position.items():
+            r, c = pos
+            if isinstance(content, dict) and ("object" in content or "obj" in content):
+                obj = content.get("object") or content.get("obj")
+                recursos.append(obj)
+            else:
+                if isinstance(content, dict):
+                    item = dict(content)
+                    item.setdefault("position", pos)
+                    recursos.append(item)
+                else:
+                    recursos.append(content)
         return recursos
+    
+    def get_resource_at(self, row: int, col: int) -> Optional[dict]:
+        """Obtiene el recurso en una posición específica - O(1)"""
+        return self.resources_by_position.get((row, col))
+    
+    def get_vehicles_at(self, row: int, col: int) -> List:
+        """Obtiene los vehículos en una posición específica - O(1)"""
+        return self.vehicles_by_position.get((row, col), [])
+    
+    def find_nearest_resource(self, position: Tuple[int, int], resource_type: Optional[str] = None) -> Optional[Tuple[int, int]]:
+        """Encuentra el recurso más cercano a una posición dada - Optimizado con hash table"""
+        best_pos = None
+        best_dist = float('inf')
+        r0, c0 = position
+        
+        # Iterar solo sobre recursos activos en la hash table
+        for pos, content in self.resources_by_position.items():
+            r, c = pos
+            # Filtrar por tipo si se especifica
+            if resource_type:
+                res_type = content.get("tipo") or content.get("subtype")
+                if res_type != resource_type:
+                    continue
+            
+            # Distancia Manhattan
+            dist = abs(r - r0) + abs(c - c0)
+            if dist < best_dist:
+                best_dist = dist
+                best_pos = pos
+        
+        return best_pos
 
     def place_vehicle(self, vehicle, new_row, new_col, tick=None, mine_manager=None, player1=None, player2=None):
         """
@@ -202,14 +249,24 @@ class MapGraph:
                 
                 # Limpiar el contenido del vehículo, pero preservar el estado de la base
                 if should_clear:
+                    old_pos_tuple = (old_row, old_col)
                     if original_base_state:
                         # Si estaba en una base, restaurar el estado de la base sin el vehículo
                         old_node.state = original_base_state
                         old_node.content = {} if not isinstance(old_node.content, list) or not old_node.content else old_node.content
+                        # Actualizar hash table de vehículos
+                        if old_pos_tuple in self.vehicles_by_position:
+                            if not old_node.content or (isinstance(old_node.content, list) and not old_node.content):
+                                del self.vehicles_by_position[old_pos_tuple]
+                            else:
+                                self.vehicles_by_position[old_pos_tuple] = old_node.content if isinstance(old_node.content, list) else [old_node.content]
                     else:
                         # Si no estaba en una base, limpiar completamente
                         old_node.state = "empty"
                         old_node.content = {}
+                        # Limpiar hash table de vehículos
+                        if old_pos_tuple in self.vehicles_by_position:
+                            del self.vehicles_by_position[old_pos_tuple]
 
         # Obtener destino
         node = self.get_node(new_row, new_col)
@@ -302,6 +359,10 @@ class MapGraph:
                                 "object": vehicle
                             })
                         
+                        # Actualizar hash table de vehículos
+                        pos = (new_row, new_col)
+                        self.vehicles_by_position[pos] = node.content
+                        
                         # Actualizar posición del vehículo
                         if hasattr(vehicle, "move_to"):
                             try:
@@ -325,14 +386,21 @@ class MapGraph:
                             veh_obj.collected_value = 0
                         
                         # Limpiar el nodo
+                        pos = (new_row, new_col)
                         # Preservar el estado de la base si estaba en una base
                         if node.state in ("base_p1", "base_p2"):
                             # Mantener el estado de la base pero limpiar el contenido del vehículo
                             node.content = {}
+                            # Limpiar hash table de vehículos
+                            if pos in self.vehicles_by_position:
+                                del self.vehicles_by_position[pos]
                             return False  # No permitir el movimiento
                         else:
                             node.state = "empty"
                             node.content = {}
+                            # Limpiar hash table de vehículos
+                            if pos in self.vehicles_by_position:
+                                del self.vehicles_by_position[pos]
                             return False  # No permitir el movimiento
         
         # Guardar el estado original de la base si existe
@@ -376,8 +444,12 @@ class MapGraph:
 
                 if picked:
                     # eliminar recurso del mapa
+                    pos = (new_row, new_col)
                     node.state = "empty"
                     node.content = {}
+                    # Eliminar de hash table de recursos
+                    if pos in self.resources_by_position:
+                        del self.resources_by_position[pos]
                     resource_picked = True
 
                     # si después de recoger no quedan viajes (trips_done_since_base == 0) o estado exige volver, marcar
@@ -455,6 +527,7 @@ class MapGraph:
             node.state = "vehicle"
         
         # Guardar el vehículo en el contenido (tanto si está en base como si no)
+        pos = (new_row, new_col)
         if isinstance(vehicle, dict):
             node.content = vehicle
         else:
@@ -466,6 +539,14 @@ class MapGraph:
                 "position": (new_row, new_col),
                 "object": vehicle
             }
+        
+        # Actualizar hash table de vehículos
+        if pos not in self.vehicles_by_position:
+            self.vehicles_by_position[pos] = []
+        if isinstance(node.content, list):
+            self.vehicles_by_position[pos] = node.content
+        else:
+            self.vehicles_by_position[pos] = [node.content]
 
         # Actualizar el objeto vehículo (usar move_to si existe)
         if hasattr(vehicle, "move_to"):
@@ -497,6 +578,9 @@ class MapGraph:
                     # Limpiar el nodo donde estaba el vehículo
                     node.state = "empty"
                     node.content = {}
+                    # Limpiar hash tables
+                    if pos in self.vehicles_by_position:
+                        del self.vehicles_by_position[pos]
                     return True  # Retornamos True porque técnicamente se "colocó" (aunque explotó)
 
         return True
