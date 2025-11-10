@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict, Optional, Set
 from pathlib import Path
 
 TRUCK_COLOR = (30, 144, 255)
@@ -174,23 +174,132 @@ class Vehicle:
 
 
 class VehicleManager:
-    """Gestiona la flota de vehículos y los almacena en una hash table (dict).
+    """Gestiona la flota de vehículos con múltiples hash tables para búsquedas eficientes.
 
-    La hash table usa el id del vehículo como clave y el objeto Vehicle como valor.
-    Se provee un método para crear la flota base según las especificaciones del proyecto.
+    Hash tables implementadas:
+    - vehicles: Dict[id -> Vehicle] - Búsqueda por ID O(1)
+    - vehicles_by_type: Dict[type -> List[Vehicle]] - Búsqueda por tipo O(1)
+    - vehicles_by_status: Dict[status -> Set[id]] - Búsqueda por estado O(1)
+    
+    Todas las hash tables se mantienen sincronizadas automáticamente.
     """
     def __init__(self):
+        # Hash table principal: ID -> Vehicle
         self.vehicles: Dict[str, Vehicle] = {}
+        
+        # Hash table por tipo: type -> [Vehicle IDs]
+        self.vehicles_by_type: Dict[str, List[str]] = {
+            "jeep": [],
+            "moto": [],
+            "camion": [],
+            "auto": []
+        }
+        
+        # Hash table por estado: status -> {Vehicle IDs}
+        self.vehicles_by_status: Dict[str, Set[str]] = {
+            "in_base": set(),
+            "moving": set(),
+            "need_return": set(),
+            "destroyed": set()
+        }
 
     def add_vehicle(self, vehicle: Vehicle):
+        """Agrega un vehículo y actualiza todas las hash tables - O(1)"""
         self.vehicles[vehicle.id] = vehicle
+        
+        # Actualizar hash table por tipo
+        if vehicle.type in self.vehicles_by_type:
+            self.vehicles_by_type[vehicle.type].append(vehicle.id)
+        
+        # Actualizar hash table por estado
+        if vehicle.status in self.vehicles_by_status:
+            self.vehicles_by_status[vehicle.status].add(vehicle.id)
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle | None:
+        """Obtiene un vehículo por ID - O(1)"""
         return self.vehicles.get(vehicle_id)
 
     def remove_vehicle(self, vehicle_id: str):
+        """Elimina un vehículo y actualiza todas las hash tables - O(1)"""
         if vehicle_id in self.vehicles:
+            vehicle = self.vehicles[vehicle_id]
+            
+            # Eliminar de hash table principal
             del self.vehicles[vehicle_id]
+            
+            # Eliminar de hash table por tipo
+            if vehicle.type in self.vehicles_by_type:
+                try:
+                    self.vehicles_by_type[vehicle.type].remove(vehicle.id)
+                except ValueError:
+                    pass
+            
+            # Eliminar de hash table por estado
+            if vehicle.status in self.vehicles_by_status:
+                self.vehicles_by_status[vehicle.status].discard(vehicle.id)
+    
+    def update_vehicle_status(self, vehicle_id: str, new_status: str) -> bool:
+        """Actualiza el estado de un vehículo y sincroniza hash tables - O(1)"""
+        vehicle = self.get_vehicle(vehicle_id)
+        if not vehicle:
+            return False
+        
+        old_status = vehicle.status
+        
+        # Eliminar del conjunto de estado antiguo
+        if old_status in self.vehicles_by_status:
+            self.vehicles_by_status[old_status].discard(vehicle_id)
+        
+        # Actualizar estado del vehículo
+        vehicle.status = new_status
+        
+        # Agregar al conjunto de nuevo estado
+        if new_status not in self.vehicles_by_status:
+            self.vehicles_by_status[new_status] = set()
+        self.vehicles_by_status[new_status].add(vehicle_id)
+        
+        return True
+    
+    def get_vehicles_by_type(self, vehicle_type: str) -> List[Vehicle]:
+        """Obtiene todos los vehículos de un tipo específico - O(k) donde k = vehículos de ese tipo"""
+        if vehicle_type not in self.vehicles_by_type:
+            return []
+        
+        return [self.vehicles[vid] for vid in self.vehicles_by_type[vehicle_type] if vid in self.vehicles]
+    
+    def get_vehicles_by_status(self, status: str) -> List[Vehicle]:
+        """Obtiene todos los vehículos con un estado específico - O(k) donde k = vehículos en ese estado"""
+        if status not in self.vehicles_by_status:
+            return []
+        
+        return [self.vehicles[vid] for vid in self.vehicles_by_status[status] if vid in self.vehicles]
+    
+    def get_available_vehicles(self) -> List[Vehicle]:
+        """Obtiene vehículos disponibles (no destruidos, no necesitan volver urgente) - O(k)"""
+        available = []
+        for status in ["in_base", "moving"]:
+            if status in self.vehicles_by_status:
+                for vid in self.vehicles_by_status[status]:
+                    vehicle = self.vehicles.get(vid)
+                    if vehicle and vehicle.capacity > 0:
+                        available.append(vehicle)
+        return available
+    
+    def get_vehicles_needing_return(self) -> List[Vehicle]:
+        """Obtiene vehículos que necesitan regresar a base - O(k)"""
+        return self.get_vehicles_by_status("need_return")
+    
+    def get_destroyed_vehicles(self) -> List[Vehicle]:
+        """Obtiene vehículos destruidos - O(k)"""
+        return self.get_vehicles_by_status("destroyed")
+    
+    def count_by_type(self, vehicle_type: str) -> int:
+        """Cuenta vehículos de un tipo específico - O(1)"""
+        return len(self.vehicles_by_type.get(vehicle_type, []))
+    
+    def count_by_status(self, status: str) -> int:
+        """Cuenta vehículos en un estado específico - O(1)"""
+        return len(self.vehicles_by_status.get(status, set()))
 
     def create_default_fleet(self, player_num=1):
         """Crea la flota según las especificaciones del proyecto:
