@@ -34,7 +34,6 @@ class Visualization:
         self.buttons = []
         # Cache de imágenes para evitar cargar desde disco en cada frame
         self.image_cache = {}
-        #self.font = pygame.font.Font('paraIntegrar/assets/PressStart2P-Regular.ttf', 12)
         self.create_buttons()
 
     def get_cached_image(self, img_path, size):
@@ -135,8 +134,6 @@ class Visualization:
         else:
             self.drawMap()
             self.drawCollisionAnimations()  # Dibujar animaciones de colisiones
-            #self.drawDebugPanel()  # Mostrar panel de debug (DESACTIVADO)
-            #self.drawTickInfo()  # Mostrar información del tick
             
             # Dibujar botones según visibilidad de INIT
             if show_init:
@@ -176,12 +173,19 @@ class Visualization:
                 x, y = col * CELL_SIZE + 390, row * CELL_SIZE + 20
                 rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
                 
-                # Dibujar bases con color diferente (gris oscuro/azul oscuro)
+                # Dibujar bases con color diferente (más visible)
                 # Dibujar la base primero para que esté debajo de los vehículos
                 if node.state in ("base_p1", "base_p2"):
-                    # Color para las bases: un gris/azul más oscuro que el fondo
-                    BASE_COLOR = (30, 40, 60)  # Color oscuro para las bases
-                    pygame.draw.rect(self.screen, BASE_COLOR, rect, 0)  # Relleno sólido
+                    # Colores distintos para cada base
+                    if node.state == "base_p1":
+                        BASE_COLOR = (40, 60, 90)  # Azul oscuro para jugador 1
+                        BORDER_COLOR = (70, 110, 180)  # Borde azul
+                    else:
+                        BASE_COLOR = (90, 40, 40)  # Rojo oscuro para jugador 2
+                        BORDER_COLOR = (180, 70, 70)  # Borde rojo
+                    
+                    pygame.draw.rect(self.screen, BASE_COLOR, rect, 0)  # Relleno
+                    pygame.draw.rect(self.screen, BORDER_COLOR, rect, 1)  # Borde de color
                 
                 if node.state == 'resource' and node.content:
                     img = self.get_cached_image(node.content.img_path, (CELL_SIZE, CELL_SIZE))
@@ -246,7 +250,9 @@ class Visualization:
                                 circle_center = (rect.center[0] + displacement, rect.center[1] + displacement)
                                 pygame.draw.circle(self.screen, color, circle_center, 6)
 
-                pygame.draw.rect(self.screen, PALETTE_6, rect, 1)
+                # Dibujar grid del mapa (más visible pero sutil)
+                if node.state not in ("base_p1", "base_p2"):  # Las bases ya tienen su propio borde
+                    pygame.draw.rect(self.screen, PALETTE_6, rect, 1)
 
     def drawCollisionAnimations(self):
         """Dibuja las animaciones de colisiones activas"""
@@ -277,7 +283,7 @@ class Visualization:
                                             colors=[(255, 200, 0), (255, 150, 0), (200, 100, 0)])
     
     def _draw_explosion_effect(self, center_x, center_y, progress, colors):
-        """Dibuja un efecto de explosión con círculos concéntricos
+        """Dibuja un efecto de explosión simple con círculos concéntricos
         
         Args:
             center_x, center_y: Coordenadas del centro de la explosión
@@ -309,24 +315,6 @@ class Visualization:
                 pygame.draw.circle(temp_surface, color_with_alpha, (radius, radius), radius)
                 # Dibujar en pantalla
                 self.screen.blit(temp_surface, (center_x - radius, center_y - radius))
-        
-        # Agregar partículas dispersas en la fase de expansión
-        if progress < 0.5:
-            import random
-            random.seed(int(center_x * center_y))  # Seed para consistencia
-            num_particles = 8
-            for i in range(num_particles):
-                angle = (i / num_particles) * 2 * 3.14159
-                distance = int(max_radius * 1.5 * progress)
-                particle_x = int(center_x + distance * pygame.math.Vector2(1, 0).rotate_rad(angle).x)
-                particle_y = int(center_y + distance * pygame.math.Vector2(1, 0).rotate_rad(angle).y)
-                particle_radius = max(1, int(4 * (1 - progress)))
-                particle_color = (*colors[0], alpha)
-                
-                # Crear superficie temporal para la partícula
-                particle_surface = pygame.Surface((particle_radius * 2, particle_radius * 2), pygame.SRCALPHA)
-                pygame.draw.circle(particle_surface, particle_color, (particle_radius, particle_radius), particle_radius)
-                self.screen.blit(particle_surface, (particle_x - particle_radius, particle_y - particle_radius))
 
     def drawDebugPanel(self):
         """Dibuja el panel de debug con eventos de colisiones y destrucciones"""
@@ -421,10 +409,10 @@ class Visualization:
         info = self.engine.game_over_info
         screen_width, screen_height = self.screen.get_size()
 
-        # Fondo semi-transparente oscuro
+        # Fondo semi-transparente oscuro con gradiente visual
         overlay = pygame.Surface((screen_width, screen_height))
-        overlay.set_alpha(220)
-        overlay.fill((15, 20, 35))
+        overlay.set_alpha(230)
+        overlay.fill((10, 15, 25))  # Fondo más oscuro para mejor contraste
         self.screen.blit(overlay, (0, 0))
 
         # Intentar cargar la fuente Press_Start_2P desde assets; fallback a fuente por defecto
@@ -443,8 +431,18 @@ class Visualization:
 
         y_offset = 50
 
-        # Título "FIN DEL JUEGO"
-        title = title_font.render("FIN DEL JUEGO", True, (255, 255, 100))
+        # Título "FIN DEL JUEGO" con sombra para mejor legibilidad
+        title_text = "FIN DEL JUEGO"
+        title_color = (255, 255, 120)  # Amarillo brillante
+        shadow_color = (80, 80, 0)     # Sombra oscura
+        
+        # Dibujar sombra
+        title_shadow = title_font.render(title_text, True, shadow_color)
+        shadow_rect = title_shadow.get_rect(center=(screen_width // 2 + 3, y_offset + 3))
+        self.screen.blit(title_shadow, shadow_rect)
+        
+        # Dibujar título
+        title = title_font.render(title_text, True, title_color)
         title_rect = title.get_rect(center=(screen_width // 2, y_offset))
         self.screen.blit(title, title_rect)
         y_offset += 100
@@ -455,11 +453,11 @@ class Visualization:
         self.screen.blit(reason_text, reason_rect)
         y_offset += 60
 
-        # Anuncio del ganador
+        # Anuncio del ganador (colores más vibrantes)
         winner_colors = {
-            "blue": (100, 150, 255),
-            "red": (255, 100, 100),
-            "gray": (150, 150, 150)
+            "blue": (100, 180, 255),   # Azul más brillante
+            "red": (255, 120, 120),    # Rojo más brillante
+            "gray": (180, 180, 190)    # Gris más claro
         }
         winner_color = winner_colors.get(info.get("winner_color"), (255, 255, 255))
 
@@ -567,12 +565,13 @@ class Visualization:
             "destroyed": "Destruidos"
         }
         
+        # Colores más vibrantes y legibles para las estadísticas
         status_colors = {
-            "in_base": (100, 255, 100),
-            "in_mission": (255, 200, 100),
-            "returning": (100, 200, 255),
-            "job_done": (150, 255, 150),
-            "destroyed": (255, 100, 100)
+            "in_base": (120, 255, 120),      # Verde brillante
+            "in_mission": (255, 220, 120),   # Amarillo/naranja brillante
+            "returning": (120, 200, 255),    # Azul cielo
+            "job_done": (180, 255, 180),     # Verde claro
+            "destroyed": (255, 120, 120)     # Rojo brillante
         }
         
         for status, label in status_labels.items():

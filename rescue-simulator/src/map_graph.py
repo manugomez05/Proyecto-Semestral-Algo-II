@@ -346,7 +346,6 @@ class MapGraph:
         
         if resource:
             # Determinar tipo y valor del recurso (soportar dict y objeto)
-            # print("Recurso", resource)
             if isinstance(resource, dict):
                 # soportar claves comunes: 'type' o 'subtype'; puntos en 'points' o 'value'
                 res_type = resource.get("tipo") or resource.get("subtype")
@@ -354,8 +353,6 @@ class MapGraph:
             else:
                 res_type = getattr(resource, "tipo", None)
                 res_value = getattr(resource, "puntos", getattr(resource, "value", 1))
-
-            # print("res_type", res_type, "res_value", res_value)
 
             # Obtener referencia al objeto Vehicle si es posible
             veh_obj = None
@@ -385,7 +382,6 @@ class MapGraph:
 
                     # si después de recoger no quedan viajes (trips_done_since_base == 0) o estado exige volver, marcar
                     try:
-                        # print("ENTRO")
                         max_consecutive_trips = getattr(veh_obj, "max_consecutive_trips", None)
 
                         if getattr(veh_obj, "trips_done_since_base", None) and veh_obj.trips_done_since_base >= max_consecutive_trips:
@@ -501,7 +497,6 @@ class MapGraph:
                     # Limpiar el nodo donde estaba el vehículo
                     node.state = "empty"
                     node.content = {}
-                    # print(f"¡Vehículo {getattr(veh_obj, 'id', 'unknown')} explotó en mina en posición ({new_row}, {new_col})!")
                     return True  # Retornamos True porque técnicamente se "colocó" (aunque explotó)
 
         return True

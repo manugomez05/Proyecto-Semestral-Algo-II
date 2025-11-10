@@ -137,7 +137,6 @@ class Vehicle:
         self.capacity -= 1
 
         if self.capacity <= 0:
-            # print("ENTRO CAPACIDAD")
             self.status = "need_return"
 
         # no sobrepasar la capacidad física; si se alcanza, forzar regreso
@@ -264,26 +263,3 @@ class VehicleManager:
 
     def all_vehicles(self) -> Dict[str, Vehicle]:
         return dict(self.vehicles)
-
-
-
-# from src.vehicle import VehicleManager
-
-# vm = VehicleManager()
-# vm.create_default_fleet()
-
-# # Mostrar ids
-# print(list(vm.vehicles.keys()))
-# # Obtener un vehículo y ver sus datos
-# v = vm.get_vehicle('jeep_1')
-# print(v.to_dict())
-
-# # Simular que recoge una persona y finaliza el viaje
-# v.start_trip()
-# v.end_trip(picked_up='people')
-# print(v.status, v.trips_done_since_base)
-
-# # Si necesita volver, llamar:
-# if v.status == 'need_return':
-#     v.arrive_base()
-#     print('Volvió a base:', v.status, v.trips_done_since_base)

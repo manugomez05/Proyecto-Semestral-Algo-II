@@ -65,8 +65,6 @@ class Player:
         """
         if self.strategy:
             self.strategy(self, game_state)
-        else:
-            print(f"[WARN] {self.name} no tiene estrategia asignada.")
 
     # -----------------------------------------------------
     # Reinicio del jugador (para nuevas simulaciones)

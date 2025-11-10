@@ -73,9 +73,6 @@ class GameEngine:
         # Mantener solo los últimos N eventos
         if len(self.debug_events) > self.max_debug_events:
             self.debug_events.pop(0)
-        
-        # También imprimir en consola (DESACTIVADO para no saturar)
-        # print(f"[Tick {self.tick}] [{event_type.upper()}] {message}")
     
     def add_collision_animation(self, position, animation_type="vehicle"):
         """Agrega una animación de colisión en la posición especificada
@@ -106,7 +103,6 @@ class GameEngine:
             self.collision_animations.pop(i)
     
     def init_game(self):
-        print("Inicializando mapa...")
         self.map.clear_map()
         self.debug_events = []  # Limpiar eventos al iniciar nuevo juego
         self.collision_animations = []  # Limpiar animaciones al iniciar nuevo juego
@@ -130,9 +126,8 @@ class GameEngine:
             if self._saved_states_dir.exists():
                 import shutil
                 shutil.rmtree(self._saved_states_dir)
-                print("Estados guardados anteriores limpiados")
-        except Exception as e:
-            print(f"Advertencia: no se pudieron limpiar estados anteriores: {e}")
+        except Exception:
+            pass  # Silenciar error, no es crítico
         
         resources = self.map.generate_random_map()
 
@@ -146,8 +141,7 @@ class GameEngine:
             
             # Estrategia 2 para player2: usa Dijkstra
             self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
-        except Exception as e:
-            print(f"Error al asignar estrategias: {e}")
+        except Exception:
             self.player1.strategy = None
             self.player2.strategy = None
 
@@ -277,15 +271,10 @@ class GameEngine:
             
             # Verificar que el archivo existe
             if final_path.exists():
-                # print(f"✅ Estado guardado: state_{self.tick}.pickle")  # Desactivado para no saturar
                 return str(final_path)
             else:
-                print(f"❌ Error: archivo no se creó: state_{self.tick}.pickle")
                 return None
-        except Exception as e:
-            print(f"❌ Error al guardar estado del tick {self.tick}: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
             # Asegurar que restauramos las estrategias incluso si hay error
             try:
                 if 'strategy1' in locals():
@@ -316,18 +305,14 @@ class GameEngine:
             try:
                 self.player1.strategy = Strategy1(self.map.cols, self.map.rows, self.map, self.player2)
                 self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
-                # print(f"✅ Estado cargado desde {filename}")  # Desactivado
-            except Exception as e:
-                print(f"⚠️ Estrategias no se pudieron restaurar: {e}")
+            except Exception:
                 self.player1.strategy = None
                 self.player2.strategy = None
             
             return True
-        except (EOFError, pickle.UnpicklingError) as e:
-            print(f"❌ Error al cargar estado (archivo corrupto o incompleto): {e}")
+        except (EOFError, pickle.UnpicklingError):
             return False
-        except Exception as e:
-            print(f"❌ Error inesperado al cargar estado: {e}")
+        except Exception:
             return False
 
     def step_forward(self):
@@ -335,21 +320,16 @@ class GameEngine:
         # Ejecutar un único tick aunque el motor esté en pausa
         # (update ya guarda el estado cuando force=True)
         self.update(force=True)
-        # print(f"⏩ Avanzado a tick {self.tick}")  # Desactivado
         self.add_debug_event('system', f"⏩ Avanzado a tick {self.tick}", (100, 200, 255))
         
     def step_backward(self):
         """Retrocede un paso en la simulación"""
-        # print(f"🔙 step_backward() llamado en tick={self.tick}")  # Desactivado
-        
         # Verificar que exista la carpeta de estados
         if not self._saved_states_dir.exists():
-            print("❌ No hay carpeta de estados guardados")
             self.add_debug_event('system', "❌ No hay estados guardados", (255, 100, 100))
             return
         
         if self.tick <= 0:
-            print("⚠️ Ya estás en el tick 0")
             self.add_debug_event('system', "⚠️ Ya en tick 0", (200, 200, 0))
             return
         
@@ -360,7 +340,6 @@ class GameEngine:
         if os.path.exists(filename):
             ok = self.load_state(filename)
             if ok:
-                # print(f"✅ Retrocedido a tick {self.tick}")  # Desactivado
                 self.add_debug_event('system', f"⏮️ Retrocedido a tick {self.tick}", (100, 255, 100))
                 return
         
@@ -371,13 +350,11 @@ class GameEngine:
             if os.path.exists(filename):
                 ok = self.load_state(filename)
                 if ok:
-                    # print(f"✅ Retrocedido a tick {self.tick}")  # Desactivado
                     self.add_debug_event('system', f"⏮️ Retrocedido a tick {self.tick}", (100, 255, 100))
                     found = True
                     break
 
         if not found:
-            print("❌ No se encontraron estados guardados")
             self.add_debug_event('system', "❌ No hay estados guardados", (255, 100, 100))
     
     def _check_game_over_conditions(self):
@@ -542,8 +519,8 @@ class GameEngine:
         # Actualizar minas dinámicas (G1) basadas en ticks
         try:
             self.map.mine_manager.updateAll(self.tick, self.map.rows, self.map.cols, elapsed_time, self.map)
-        except Exception as e:
-            print(f"Error al actualizar minas: {e}")
+        except Exception:
+            pass  # Silenciar error
 
         # Verificar si algún vehículo está en una posición minada después de actualizar las minas
         self._check_vehicles_on_mines()
@@ -555,16 +532,16 @@ class GameEngine:
         if strategy1 is not None and callable(getattr(strategy1, "update", None)):
             try:
                 strategy1.update(self.player1)
-            except Exception as e:
-                print(f"Error al ejecutar estrategia player1: {e}")
+            except Exception:
+                pass  # Silenciar error
         
         # Mover vehículos del jugador 2 usando su estrategia si está presente
         strategy2 = getattr(self.player2, "strategy", None)
         if strategy2 is not None and callable(getattr(strategy2, "update", None)):
             try:
                 strategy2.update(self.player2)
-            except Exception as e:
-                print(f"Error al ejecutar estrategia player2: {e}")
+            except Exception:
+                pass  # Silenciar error
         
         # Verificar colisiones entre vehículos de equipos distintos
         self._check_vehicle_collisions()
@@ -583,8 +560,6 @@ class GameEngine:
         if game_over:
             self.state = "game_over"
             self.game_over_info = self._determine_winner(reason)
-            print(f"🏁 JUEGO TERMINADO: {reason}")
-            print(f"🏆 GANADOR: {self.game_over_info['winner']}")
     
     def _check_vehicles_on_mines(self):
         """Verifica si algún vehículo está en una posición minada y lo destruye"""
