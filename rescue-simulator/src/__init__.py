@@ -34,6 +34,6 @@ PALETTE_6 = (35, 50, 75)      # Grid mejorado (más visible)
 CELL_SIZE = 17          # tamaño de celda del mapa
 SCREEN_WIDTH = 1600     # ancho de ventana
 SCREEN_HEIGHT = 960     # alto de ventana
-FPS = 10          # cuadros por segundo
+FPS = 40                # cuadros por segundo
 
 # package marker

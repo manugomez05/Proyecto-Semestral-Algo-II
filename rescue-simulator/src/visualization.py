@@ -90,6 +90,9 @@ class Visualization:
         # Botón save siempre en la misma posición
         self.save_button = Button(str(assets_path / 'saveBtn.png'), 'bottomLeft', (40,0), """partial(self.engine.save_game)""")
         
+        # Botón de salida (X) en la esquina superior derecha (misma posición relativa que el botón de guardado)
+        self.exit_button = TextButton('X', 'topRight', (-40, 0), exit, font_size=32, color=(255, 80, 80), hover_color=(255, 120, 120))
+        
         # Lista de botones para manejar eventos (se actualizará dinámicamente)
         self.buttons = []
 
@@ -118,6 +121,9 @@ class Visualization:
             
             # Botón save siempre disponible
             self.save_button.handle_event(event)
+            
+            # Botón de salida siempre disponible
+            self.exit_button.handle_event(event)
 
     def render(self):
         self.screen.fill(BLACK)
@@ -152,6 +158,9 @@ class Visualization:
             
             # Botón save siempre visible
             self.save_button.draw(self.screen)
+        
+        # Botón de salida siempre visible
+        self.exit_button.draw(self.screen)
         
         pygame.display.flip()
 
@@ -536,49 +545,50 @@ class Visualization:
         self.forward_button.draw(self.screen)
         self.stop_button.draw(self.screen)
         self.save_button.draw(self.screen)
+        self.exit_button.draw(self.screen)
     
     def _draw_player_stats(self, player_info, x, y, width, info_font, small_font, color):
         """Dibuja las estadísticas de un jugador"""
+        screen_width, _ = self.screen.get_size()  # Obtener ancho de pantalla para centrar
         y_offset = y
         
-        # Nombre del jugador
+        # Nombre del jugador (centrado)
         name_text = info_font.render(player_info["name"], True, color)
-        self.screen.blit(name_text, (x, y_offset))
+        name_rect = name_text.get_rect(center=(screen_width // 2, y_offset))
+        self.screen.blit(name_text, name_rect)
         y_offset += 50
         
-        # Puntuación
+        # Puntuación (centrado)
         score_text = info_font.render(f"Puntos: {player_info['score']}", True, PALETTE_1)
-        self.screen.blit(score_text, (x, y_offset))
+        score_rect = score_text.get_rect(center=(screen_width // 2, y_offset))
+        self.screen.blit(score_text, score_rect)
         y_offset += 60
         
-        # Estado de vehículos
+        # Estado de vehículos (centrado)
         vehicles_title = small_font.render("Estado de Vehículos:", True, (200, 200, 200))
-        self.screen.blit(vehicles_title, (x, y_offset))
+        vehicles_title_rect = vehicles_title.get_rect(center=(screen_width // 2, y_offset))
+        self.screen.blit(vehicles_title, vehicles_title_rect)
         y_offset += 40
         
         vehicles = player_info["vehicles"]
+        # Solo mostrar: job_done y destroyed
         status_labels = {
-            "in_base": "En base",
-            "in_mission": "En misión",
-            "returning": "Regresando",
             "job_done": "Trabajo hecho",
             "destroyed": "Destruidos"
         }
         
         # Colores más vibrantes y legibles para las estadísticas
         status_colors = {
-            "in_base": (120, 255, 120),      # Verde brillante
-            "in_mission": (255, 220, 120),   # Amarillo/naranja brillante
-            "returning": (120, 200, 255),    # Azul cielo
             "job_done": (180, 255, 180),     # Verde claro
             "destroyed": (255, 120, 120)     # Rojo brillante
         }
         
         for status, label in status_labels.items():
             count = vehicles.get(status, 0)
-            color = status_colors.get(status, (255, 255, 255))
-            status_text = small_font.render(f"  {label}: {count}", True, color)
-            self.screen.blit(status_text, (x + 20, y_offset))
+            status_color = status_colors.get(status, (255, 255, 255))
+            status_text = small_font.render(f"{label}: {count}", True, status_color)
+            status_rect = status_text.get_rect(center=(screen_width // 2, y_offset))
+            self.screen.blit(status_text, status_rect)
             y_offset += 30
 
 class Button:
@@ -616,6 +626,62 @@ def align(surface, position, offset=(0,0), margin=10):
         rect.bottomleft = screen_rect.bottomleft
         rect.x += margin
         rect.y -= margin
+    elif position == "topRight":
+        rect.topright = screen_rect.topright
+        rect.x -= margin
+        rect.y += margin
     
     rect.move_ip(offset)
     return rect
+
+
+class TextButton:
+    """Botón de texto usando la misma tipografía del juego"""
+    
+    def __init__(self, text, position, offset=(0,0), action=None, font_size=24, color=(255, 255, 255), hover_color=(255, 200, 200)):
+        self.text = text
+        self.position = position
+        self.offset = offset
+        self.action = action
+        self.font_size = font_size
+        self.color = color
+        self.hover_color = hover_color
+        self.hovered = False
+        
+        # Cargar fuente Press_Start_2P
+        try:
+            root_path = Path(__file__).resolve().parents[1]
+            font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
+            self.font = pygame.font.Font(str(font_path), font_size)
+        except Exception:
+            self.font = pygame.font.Font(None, font_size)
+        
+        # Crear superficie inicial
+        self._update_surface()
+        self.rect = align(self.surface, position, offset)
+    
+    def _update_surface(self):
+        """Actualiza la superficie del texto"""
+        color = self.hover_color if self.hovered else self.color
+        self.surface = self.font.render(self.text, True, color)
+    
+    def draw(self, screen):
+        """Dibuja el botón en la pantalla"""
+        # Verificar si el mouse está sobre el botón
+        mouse_pos = pygame.mouse.get_pos()
+        was_hovered = self.hovered
+        self.hovered = self.rect.collidepoint(mouse_pos)
+        
+        # Si cambió el estado de hover, actualizar superficie
+        if was_hovered != self.hovered:
+            self._update_surface()
+            self.rect = align(self.surface, self.position, self.offset)
+        
+        screen.blit(self.surface, self.rect)
+    
+    def handle_event(self, event):
+        """Maneja eventos del botón"""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                if self.action:
+                    self.action()

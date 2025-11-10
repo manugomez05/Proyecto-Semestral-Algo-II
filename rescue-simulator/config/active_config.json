@@ -1,23 +1,9 @@
 {
-  "saved_at": "2025-11-09T22:22:02.392071",
+  "saved_at": "2025-11-10T15:01:49.892056",
   "config": {
     "map": {
       "rows": 50,
       "cols": 50
-    },
-    "simulation": {
-      "max_ticks": 10000,
-      "auto_save_interval": 5
-    },
-    "players": {
-      "player1": {
-        "name": "Jugador_1",
-        "strategy": "Strategy1"
-      },
-      "player2": {
-        "name": "Jugador_2",
-        "strategy": "Strategy2"
-      }
     }
   }
 }

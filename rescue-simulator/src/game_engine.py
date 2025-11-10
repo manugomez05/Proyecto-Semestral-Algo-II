@@ -20,6 +20,14 @@ import importlib.util
 import os
 import pickle
 import time
+from pathlib import Path
+
+# Importar sistema de persistencia
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from persistence.persistence_manager import PersistenceManager
+except ImportError:
+    PersistenceManager = None  # Si no está disponible, continuar sin persistencia
 
 # Importar Strategy2 desde player2.strategies.py (nombre con punto requiere importación especial)
 spec = importlib.util.spec_from_file_location(
@@ -37,9 +45,17 @@ class GameEngine:
         self.tick = 0  # Contador de tiempo para minas dinámicas
         self.start_time = time.time()  # Tiempo de inicio para minas basadas en tiempo
         # Directorio raíz del proyecto (rescue-simulator)
-        from pathlib import Path
         self._project_root = Path(__file__).resolve().parents[1]
         self._saved_states_dir = self._project_root / 'saved_states'
+        
+        # Sistema de persistencia
+        if PersistenceManager is not None:
+            try:
+                self.persistence = PersistenceManager(self._project_root)
+            except Exception:
+                self.persistence = None
+        else:
+            self.persistence = None
         
         # Sistema de debug: lista de eventos (colisiones, destrucciones, etc.)
         self.debug_events = []
@@ -147,6 +163,19 @@ class GameEngine:
 
         # Inicializar vehículos en la base
         self._initialize_vehicles_at_base()
+        
+        # Iniciar registro de simulación en la base de datos
+        if self.persistence is not None:
+            try:
+                config = {
+                    "map": {
+                        "rows": self.map.rows,
+                        "cols": self.map.cols
+                    }
+                }
+                self.persistence.start_new_simulation(config)
+            except Exception:
+                pass  # Si falla, continuar sin persistencia
 
         self.state = "init"
         
@@ -387,6 +416,29 @@ class GameEngine:
             self.add_debug_event('system', "🏁 Fin del juego: No hay más vehículos", (255, 255, 0))
             return True, "Todos los vehículos han sido destruidos"
         
+        # Contar vehículos en estado "job_done" (terminaron su trabajo)
+        p1_job_done = sum(1 for v in self.player1.vehicles.values() 
+                         if v.status == "job_done")
+        p2_job_done = sum(1 for v in self.player2.vehicles.values() 
+                         if v.status == "job_done")
+        
+        # Condición nueva: Si todos los vehículos no destruidos están en "job_done", terminar el juego
+        if p1_active_vehicles > 0 and p2_active_vehicles > 0:
+            # Ambos jugadores tienen vehículos activos
+            if p1_job_done == p1_active_vehicles and p2_job_done == p2_active_vehicles:
+                self.add_debug_event('system', "🏁 Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+                return True, "Todos los vehículos han completado su trabajo"
+        elif p1_active_vehicles > 0:
+            # Solo jugador 1 tiene vehículos activos
+            if p1_job_done == p1_active_vehicles:
+                self.add_debug_event('system', "🏁 Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+                return True, "Todos los vehículos han completado su trabajo"
+        elif p2_active_vehicles > 0:
+            # Solo jugador 2 tiene vehículos activos
+            if p2_job_done == p2_active_vehicles:
+                self.add_debug_event('system', "🏁 Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+                return True, "Todos los vehículos han completado su trabajo"
+        
         # El juego termina por falta de recursos solo si:
         # 1. No hay recursos en el mapa
         # 2. No hay vehículos fuera de base (todos están en base, destruidos o terminaron)
@@ -560,6 +612,9 @@ class GameEngine:
         if game_over:
             self.state = "game_over"
             self.game_over_info = self._determine_winner(reason)
+            
+            # Guardar simulación en la base de datos
+            self._save_simulation_to_database(reason)
     
     def _check_vehicles_on_mines(self):
         """Verifica si algún vehículo está en una posición minada y lo destruye"""
@@ -816,3 +871,73 @@ class GameEngine:
                                 else:
                                     node.state = "empty"
                                     node.content = {}
+    
+    def _save_simulation_to_database(self, reason):
+        """Guarda la simulación en la base de datos cuando termina el juego"""
+        if self.persistence is None:
+            return
+        
+        try:
+            # Obtener información del ganador
+            winner_name = self.game_over_info.get("winner", "Empate")
+            if winner_name == "Jugador 1":
+                winner_name = "Jugador_1"
+            elif winner_name == "Jugador 2":
+                winner_name = "Jugador_2"
+            
+            # Calcular estadísticas de jugadores
+            p1_stats = self._calculate_player_stats(self.player1)
+            p2_stats = self._calculate_player_stats(self.player2)
+            
+            # Finalizar simulación
+            self.persistence.finish_simulation(
+                total_ticks=self.tick,
+                winner=winner_name,
+                final_score_p1=self.player1.score,
+                final_score_p2=self.player2.score,
+                end_reason=reason
+            )
+            
+            # Registrar estadísticas de jugadores
+            self.persistence.record_player_stats("Jugador_1", p1_stats)
+            self.persistence.record_player_stats("Jugador_2", p2_stats)
+            
+        except Exception as e:
+            # Silenciar errores de persistencia, no es crítico para el juego
+            pass
+    
+    def _calculate_player_stats(self, player):
+        """Calcula las estadísticas de un jugador para guardar en la base de datos"""
+        vehicles_destroyed = sum(1 for v in player.vehicles.values() if v.status == "destroyed")
+        vehicles_survived = sum(1 for v in player.vehicles.values() if v.status != "destroyed")
+        
+        # Contar recursos recolectados (sumar valores de recursos recolectados)
+        resources_collected = 0
+        total_distance = 0.0
+        collisions = 0
+        mine_hits = 0
+        
+        for vehicle in player.vehicles.values():
+            # Recursos recolectados (valor total entregado)
+            if hasattr(vehicle, 'collected_value'):
+                resources_collected += vehicle.collected_value
+            
+            # Distancia recorrida
+            if hasattr(vehicle, 'distance_traveled'):
+                total_distance += vehicle.distance_traveled
+            
+            # Colisiones y minas (si están registradas)
+            if hasattr(vehicle, 'collision_count'):
+                collisions += vehicle.collision_count
+            if hasattr(vehicle, 'mine_hit_count'):
+                mine_hits += vehicle.mine_hit_count
+        
+        return {
+            "final_score": player.score,
+            "vehicles_destroyed": vehicles_destroyed,
+            "vehicles_survived": vehicles_survived,
+            "resources_collected": resources_collected,
+            "total_distance_traveled": total_distance,
+            "collisions": collisions,
+            "mine_hits": mine_hits
+        }

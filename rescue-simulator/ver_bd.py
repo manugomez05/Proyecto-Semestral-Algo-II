@@ -37,11 +37,26 @@ def format_duration(seconds):
         return f"{seconds/3600:.2f} horas"
 
 def main():
-    db_path = Path("data/simulation_history.db")
+    # Buscar la base de datos usando la ruta del script como referencia
+    script_dir = Path(__file__).resolve().parent
+    # Intentar diferentes ubicaciones posibles
+    possible_paths = [
+        script_dir / "data" / "simulation_history.db",  # Si se ejecuta desde rescue-simulator/
+        script_dir.parent / "rescue-simulator" / "data" / "simulation_history.db",  # Si se ejecuta desde el proyecto raíz
+        Path("data/simulation_history.db"),  # Ruta relativa actual
+        Path("rescue-simulator/data/simulation_history.db"),  # Desde proyecto raíz
+    ]
     
-    if not db_path.exists():
+    db_path = None
+    for path in possible_paths:
+        if path.exists():
+            db_path = path
+            break
+    
+    if db_path is None or not db_path.exists():
         print("❌ La base de datos no existe aún")
         print("   Ejecuta el simulador primero para generar datos.")
+        print(f"   Buscando en: {[str(p) for p in possible_paths]}")
         return
     
     print("=" * 70)
