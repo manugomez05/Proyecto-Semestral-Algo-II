@@ -1,0 +1,2 @@
+simulation_id,started_at,finished_at,duration_seconds,total_ticks,winner,final_score_p1,final_score_p2,status,end_reason,map_rows,map_cols
+test_sim_history_001,2025-11-09T21:53:27.489464,2025-11-09T21:53:27.525861,0.036397,500,Jugador_1,1500,1200,completed,Todos los recursos recolectados,50,50

@@ -1,0 +1,11 @@
+{
+  "type": "map",
+  "name": "test_map",
+  "created_at": "2025-11-09T21:53:27.385784",
+  "parameters": {
+    "rows": 50,
+    "cols": 50,
+    "seed": 12345
+  },
+  "mine_config": {}
+}

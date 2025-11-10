@@ -1,0 +1,10 @@
+Metric,Value
+total_simulations,1
+completed_simulations,1
+average_duration_seconds,0.036397
+average_ticks,500.0
+average_score_p1,1500.0
+average_score_p2,1200.0
+
+wins_by_player,
+  Jugador_1,1
