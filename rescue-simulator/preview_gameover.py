@@ -10,7 +10,7 @@ class FakeEngine:
         self.state = "game_over"
         self.game_over_info = {
             "reason": "Tiempo agotado",
-            "winner": "Empate",
+            "winner": "Jugador_1",
             "winner_color": "blue",
             "player1": {
                 "name": "Jugador_1",

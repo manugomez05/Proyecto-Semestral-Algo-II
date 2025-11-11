@@ -520,7 +520,8 @@ class Visualization:
                 # Si no coincide el nombre, intentar inferir por puntaje mayor
                 winner_info = p1 if p1.get("score", 0) >= p2.get("score", 0) else p2
 
-            center_x = screen_width // 2 - stats_width // 2 + 100
+            # Center the stats block horizontally on the screen
+            center_x = screen_width // 2 - stats_width // 2
             if winner_info:
                 self._draw_player_stats(
                     winner_info,
@@ -548,48 +549,62 @@ class Visualization:
         self.exit_button.draw(self.screen)
     
     def _draw_player_stats(self, player_info, x, y, width, info_font, small_font, color):
-        """Dibuja las estadísticas de un jugador"""
-        screen_width, _ = self.screen.get_size()  # Obtener ancho de pantalla para centrar
+        """Dibuja las estadísticas de un jugador en un bloque centrado en (x, width)."""
+        # Seguridad: valores por defecto si faltan campos
+        name = player_info.get("name", "Jugador")
+        score = player_info.get("score", 0)
+        vehicles = player_info.get("vehicles", {}) if isinstance(player_info.get("vehicles", {}), dict) else {}
+
+        # Centro horizontal del bloque de stats
+        center_x = x + width // 2
         y_offset = y
-        
-        # Nombre del jugador (centrado)
-        name_text = info_font.render(player_info["name"], True, color)
-        name_rect = name_text.get_rect(center=(screen_width // 2, y_offset))
+
+        # (Opcional) fondo sutil para el bloque — comentar si no se desea
+        try:
+            block_h = 180
+            block_rect = pygame.Rect(x, y_offset - 10, width, block_h)
+            surf = pygame.Surface((block_rect.w, block_rect.h), pygame.SRCALPHA)
+            surf.fill((20, 20, 30, 40))  # semitransparente
+            self.screen.blit(surf, (block_rect.x, block_rect.y))
+        except Exception:
+            pass
+
+        # Nombre del jugador (centrado en el bloque)
+        name_text = info_font.render(str(name), True, color)
+        name_rect = name_text.get_rect(center=(center_x, y_offset + 10))
         self.screen.blit(name_text, name_rect)
         y_offset += 50
-        
-        # Puntuación (centrado)
-        score_text = info_font.render(f"Puntos: {player_info['score']}", True, PALETTE_1)
-        score_rect = score_text.get_rect(center=(screen_width // 2, y_offset))
+
+        # Puntuación (centrado en el bloque)
+        score_text = info_font.render(f"Puntos: {score}", True, PALETTE_1)
+        score_rect = score_text.get_rect(center=(center_x, y_offset))
         self.screen.blit(score_text, score_rect)
-        y_offset += 60
-        
-        # Estado de vehículos (centrado)
+        y_offset += 50
+
+        # Estado de vehículos (centrado en el bloque)
         vehicles_title = small_font.render("Estado de Vehículos:", True, (200, 200, 200))
-        vehicles_title_rect = vehicles_title.get_rect(center=(screen_width // 2, y_offset))
+        vehicles_title_rect = vehicles_title.get_rect(center=(center_x, y_offset))
         self.screen.blit(vehicles_title, vehicles_title_rect)
-        y_offset += 40
-        
-        vehicles = player_info["vehicles"]
-        # Solo mostrar: job_done y destroyed
+        y_offset += 30
+
+        # Mostrar solo job_done y destroyed (evitar KeyError)
         status_labels = {
             "job_done": "Trabajo hecho",
             "destroyed": "Destruidos"
         }
-        
-        # Colores más vibrantes y legibles para las estadísticas
+
         status_colors = {
-            "job_done": (180, 255, 180),     # Verde claro
-            "destroyed": (255, 120, 120)     # Rojo brillante
+            "job_done": (180, 255, 180),
+            "destroyed": (255, 120, 120)
         }
-        
+
         for status, label in status_labels.items():
             count = vehicles.get(status, 0)
             status_color = status_colors.get(status, (255, 255, 255))
             status_text = small_font.render(f"{label}: {count}", True, status_color)
-            status_rect = status_text.get_rect(center=(screen_width // 2, y_offset))
+            status_rect = status_text.get_rect(center=(center_x, y_offset))
             self.screen.blit(status_text, status_rect)
-            y_offset += 30
+            y_offset += 26
 
 class Button:
     # Cache compartido de imágenes para todos los botones
