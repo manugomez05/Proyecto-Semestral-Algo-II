@@ -1,5 +1,0 @@
-│   ├── game_engine.py          # Motor del juego
-│   ├── vehicle.py                  # Clases de vehículos
-│   ├── map_manager.py      # Gestión del mapa
-│   ├── pathfinding.py           # Algoritmos de navegación
-│   └── visualization.py        # Interfaz gráfica
