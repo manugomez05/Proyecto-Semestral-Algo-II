@@ -3,26 +3,17 @@ Estrategia del Equipo 2: Dijkstra
 - Recolectores: Dijkstra hacia recursos de mayor valor (priorizar mayor valor, en empate el más cercano según Dijkstra)
 - Motos: Atacar camiones enemigos con Dijkstra, si no hay camiones, recoger recursos con Dijkstra
 """
-
 import heapq
 from typing import List, Tuple, Optional, Set, Dict
 
-
 class Strategy2:
-    """
-    Estrategia 2: Dijkstra
-    - Motos: destruir camiones enemigos usando Dijkstra
-    - Resto de vehículos: Dijkstra hacia recursos de mayor valor
-    """
     
     def __init__(self, map_width, map_height, map, enemy_player=None):
         self.map_width = map_width
         self.map_height = map_height
         self.map = map
         self.enemy_player = enemy_player
-        # Almacenar objetivos asignados a cada vehículo para evitar conflictos
         self.vehicle_targets: Dict[str, Tuple[int, int]] = {}
-        # Cache para optimización
         self._mine_cache: Dict[Tuple[int, int, int], bool] = {}  # (row, col, tick) -> is_safe
         self._last_cache_tick: int = -1
     
@@ -89,7 +80,6 @@ class Strategy2:
         if node and hasattr(node, 'weight'):
             return float(node.weight)
         
-        # Peso por defecto
         return 1.0
     
     def dijkstra_path(self, start: Tuple[int, int], target: Tuple[int, int], player, vehicle_id: str, planned_moves: Dict[str, Tuple[int, int]] = None, max_iterations: int = 10000) -> Optional[List[Tuple[int, int]]]:
@@ -100,11 +90,8 @@ class Strategy2:
         if start == target:
             return [start]
         
-        # Cola de prioridad: (costo acumulado, posición actual)
         pq = [(0.0, start)]
-        # Diccionario de costos mínimos: posición -> costo
         costs = {start: 0.0}
-        # Diccionario de predecesores para reconstruir el camino
         predecessors = {start: None}
         
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -114,7 +101,6 @@ class Strategy2:
             iterations += 1
             current_cost, current_pos = heapq.heappop(pq)
             
-            # Si llegamos al objetivo, reconstruir el camino
             if current_pos == target:
                 path = []
                 pos = target
@@ -123,7 +109,6 @@ class Strategy2:
                     pos = predecessors[pos]
                 return list(reversed(path))
             
-            # Si encontramos un costo mayor al ya registrado, ignorar
             if current_cost > costs.get(current_pos, float('inf')):
                 continue
             
@@ -150,11 +135,9 @@ class Strategy2:
                 # No permitir entrar en la base enemiga
                 node = self.map.graph.get_node(new_row, new_col)
                 if node:
-                    # Determinar qué base es del jugador actual
                     if hasattr(player, "name"):
                         player_base = "base_p1" if "1" in player.name else "base_p2"
                         enemy_base = "base_p2" if player_base == "base_p1" else "base_p1"
-                        # No permitir entrar en base enemiga (excepto si es el objetivo)
                         if node.state == enemy_base and neighbor != target:
                             continue
                 
@@ -167,10 +150,7 @@ class Strategy2:
                     costs[neighbor] = new_cost
                     predecessors[neighbor] = current_pos
                     heapq.heappush(pq, (new_cost, neighbor))
-        
-        # Si alcanza el máximo, es probable que haya un problema
-        # pero no imprimir para no saturar la consola
-        
+                
         return None
     
     def dijkstra_distance(self, start: Tuple[int, int], target: Tuple[int, int], player, vehicle_id: str, planned_moves: Dict[str, Tuple[int, int]] = None) -> float:
@@ -190,7 +170,6 @@ class Strategy2:
     def find_enemy_trucks(self, player) -> List[Tuple[int, int]]:
         """
         Encuentra todos los camiones enemigos en el mapa que no estén destruidos
-        OPTIMIZADO: solo escanea si hay motos que necesitan objetivos
         """
         enemy_trucks = []
         if not self.enemy_player:
@@ -250,7 +229,6 @@ class Strategy2:
         candidates_by_value: Dict[int, List] = {}
         
         for resource in resources:
-            # Obtener posición del recurso
             res_pos = None
             if hasattr(resource, "position"):
                 res_pos = resource.position
@@ -260,20 +238,16 @@ class Strategy2:
             if not res_pos or len(res_pos) != 2:
                 continue
             
-            # Convertir de (x, y) a (row, col)
             res_x, res_y = res_pos[0], res_pos[1]
             res_row, res_col = res_y, res_x
             
-            # Verificar que el nodo existe y tiene un recurso
             node = self.map.graph.get_node(res_row, res_col)
             if not node or node.state != "resource":
                 continue
             
-            # Evitar recursos ya asignados a otros vehículos
             if (res_row, res_col) in assigned_targets:
                 continue
             
-            # Obtener valor del recurso
             if hasattr(resource, "puntos"):
                 value = resource.puntos
             elif isinstance(resource, dict):
@@ -281,7 +255,6 @@ class Strategy2:
             else:
                 value = 1
             
-            # Obtener tipo del recurso
             if hasattr(resource, "tipo"):
                 res_type = resource.tipo
             elif isinstance(resource, dict):
@@ -293,11 +266,9 @@ class Strategy2:
             if res_type and hasattr(vehicle, "can_pick") and not vehicle.can_pick(res_type):
                 continue
             
-            # Agrupar por valor para optimización
             if value not in candidates_by_value:
                 candidates_by_value[value] = []
             
-            # Calcular distancia Manhattan como heurística rápida
             manhattan_dist = abs(vehicle_pos[0] - res_row) + abs(vehicle_pos[1] - res_col)
             candidates_by_value[value].append({
                 'resource': resource,
@@ -309,10 +280,9 @@ class Strategy2:
         for value in sorted(candidates_by_value.keys(), reverse=True):
             candidates = candidates_by_value[value]
             
-            # Ordenar por distancia Manhattan
             candidates.sort(key=lambda x: x['manhattan'])
             
-            # Solo hacer Dijkstra en los 3 más cercanos según Manhattan de este valor
+            # Solo hacer Dijkstra en los 3 más cercanos
             max_dijkstra_checks = min(3, len(candidates))
             
             for candidate in candidates[:max_dijkstra_checks]:
@@ -321,7 +291,6 @@ class Strategy2:
                 # Calcular distancia usando Dijkstra
                 distance = self.dijkstra_distance(vehicle_pos, res_pos, player, vehicle_id, planned_moves)
                 
-                # Si no hay camino, continuar con el siguiente
                 if distance < 0:
                     continue
                 
@@ -332,7 +301,6 @@ class Strategy2:
                     best_resource = candidate['resource']
                     best_pos = res_pos
             
-            # Si ya encontramos un recurso del valor más alto, no seguir buscando valores menores
             if best_resource:
                 break
         
@@ -355,7 +323,6 @@ class Strategy2:
         
         vehicle_pos = vehicle.position
         
-        # Filtrar camiones no asignados y calcular Manhattan
         available_trucks = []
         for truck_pos in enemy_trucks:
             if truck_pos not in assigned_targets:
@@ -365,10 +332,9 @@ class Strategy2:
         if not available_trucks:
             return None
         
-        # Ordenar por distancia Manhattan
         available_trucks.sort(key=lambda x: x['manhattan'])
         
-        # Solo hacer Dijkstra en los 2 más cercanos según Manhattan
+        # Solo hacer Dijkstra en los 2 más cercanos
         max_checks = min(2, len(available_trucks))
         
         closest_truck = None
@@ -402,8 +368,6 @@ class Strategy2:
             if not self.is_occupied_by_teammate(next_pos[0], next_pos[1], player, vehicle_id, planned_moves):
                 return next_pos
             else:
-                # Si el siguiente paso está bloqueado por un compañero, intentar esperar o movimiento alternativo
-                # para evitar deadlocks
                 pass
         
         # Si no hay path válido, intentar movimiento directo
@@ -446,14 +410,14 @@ class Strategy2:
         # Dirección preferida hacia el centro
         preferred_directions = []
         if row < center_row:
-            preferred_directions.append((1, 0))  # Sur
+            preferred_directions.append((1, 0)) 
         elif row > center_row:
-            preferred_directions.append((-1, 0))  # Norte
+            preferred_directions.append((-1, 0)) 
         
         if col < center_col:
-            preferred_directions.append((0, 1))  # Este
+            preferred_directions.append((0, 1)) 
         elif col > center_col:
-            preferred_directions.append((0, -1))  # Oeste
+            preferred_directions.append((0, -1))
         
         # Todas las direcciones posibles
         all_directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
@@ -524,7 +488,6 @@ class Strategy2:
         vehicles = player.vehicles
         
         # Leer todos los recursos del mapa en cada ejecución
-        # OPTIMIZADO: usar método existente del mapa si está disponible
         resources = []
         if hasattr(self.map, 'all_resources') and callable(self.map.all_resources):
             resources = self.map.all_resources()
@@ -545,7 +508,6 @@ class Strategy2:
                         valid_resources.append(res)
             resources = valid_resources
         else:
-            # Fallback: escaneo completo del mapa
             for row in range(self.map.rows):
                 for col in range(self.map.cols):
                     node = self.map.graph.get_node(row, col)
@@ -576,7 +538,6 @@ class Strategy2:
             
             target_pos = None
             
-            # Si debe volver a la base
             if vehicle_status == "need_return":
                 if hasattr(vehicle, "base_position") and vehicle.base_position:
                     base_row, base_col = vehicle.base_position
@@ -590,10 +551,7 @@ class Strategy2:
                         base_row, base_col = 0, 0
                 target_pos = (base_row, base_col)
             
-            # Si está en la base, mantener estado in_base hasta que se mueva
-            # No cambiar automáticamente a "moving" aquí, se cambiará cuando realmente se mueva
             
-            # Si no está en need_return, buscar objetivos (incluir in_base después de entregar)
             if vehicle_status != "need_return" and target_pos is None:
                 if vehicle_type == "moto":
                     # Motos: buscar camiones enemigos primero
@@ -620,7 +578,6 @@ class Strategy2:
                 
                 # Si no encontró objetivo y no está en la base, debe volver a la base
                 if target_pos is None and vehicle_status != "in_base":
-                    # No hay recursos disponibles, volver a la base
                     if hasattr(vehicle, "base_position") and vehicle.base_position:
                         base_row, base_col = vehicle.base_position
                     else:
@@ -632,7 +589,7 @@ class Strategy2:
                         else:
                             base_row, base_col = 0, 0
                     target_pos = (base_row, base_col)
-                    vehicle.status = "need_return"  # Forzar retorno a base
+                    vehicle.status = "need_return" 
             
             vehicle_targets[vehicle_id] = target_pos
         
@@ -646,11 +603,9 @@ class Strategy2:
             
             # Si el vehículo está en la base SIN objetivo, verificar si es porque no hay recursos
             if vehicle_status == "in_base" and target_pos is None:
-                # Verificar si hay recursos que ESTE vehículo pueda recoger
                 can_pick_any = False
                 if hasattr(vehicle, "can_pick"):
                     for res in resources:
-                        # Obtener tipo del recurso
                         if hasattr(res, "tipo"):
                             res_type = res.tipo
                         elif isinstance(res, dict):
@@ -662,14 +617,12 @@ class Strategy2:
                             can_pick_any = True
                             break
                 
-                # Si no hay recursos que pueda recoger, cambiar estado a "job_done"
                 if not can_pick_any:
                     vehicle.status = "job_done"
                 
                 planned_moves[vehicle_id] = vehicle.position
                 continue
             
-            # Si está en la base PERO tiene objetivo, cambiar a "moving" para que salga
             if vehicle_status == "in_base" and target_pos is not None:
                 vehicle.status = "moving"
             
@@ -702,11 +655,9 @@ class Strategy2:
                             player.score += collected
                         vehicle.arrive_base()
                         
-                        # Verificar si hay recursos que ESTE vehículo pueda recoger
                         can_pick_any = False
                         if hasattr(vehicle, "can_pick"):
                             for res in resources:
-                                # Obtener tipo del recurso
                                 if hasattr(res, "tipo"):
                                     res_type = res.tipo
                                 elif isinstance(res, dict):
@@ -719,28 +670,21 @@ class Strategy2:
                                     break
                         
                         if can_pick_any and len(assigned_targets) < len(resources):
-                            # Hay recursos que puede recoger
                             vehicle.status = "in_base"
                         else:
-                            # No hay recursos que pueda recoger o todos están asignados
                             vehicle.status = "job_done"
                         
-                        # NO mover, ya está en la base
-                        # Asegurar que no se agregue a planned_moves para evitar duplicación
                         continue
                     elif (new_row, new_col) == (base_row, base_col):
-                        # VA A LLEGAR a la base este turno: mover y luego entregar en el siguiente tick
-                        pass  # Permitir el movimiento
+                        pass
             
             # Actualizar el estado actual por si cambió durante el procesamiento anterior
             vehicle_status = getattr(vehicle, "status", None)
             
-            # Si el vehículo está en la base y se va a mover, cambiar estado a "moving"
             if vehicle_status == "in_base" and (new_row, new_col) != current_pos:
                 vehicle.status = "moving"
-                vehicle_status = "moving"  # Actualizar la variable local también
+                vehicle_status = "moving"
             
-            # Solo mover si el vehículo no está destruido, la posición cambió y no está en estados terminales
             if (vehicle_status not in ("destroyed", "job_done") and 
                 (new_row, new_col) != current_pos):
                 try:
@@ -756,6 +700,5 @@ class Strategy2:
                             player2=self.enemy_player
                         )
                 except Exception as e:
-                    # Silenciar errores para no ralentizar
                     pass
 

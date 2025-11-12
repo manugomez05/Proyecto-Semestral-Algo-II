@@ -99,7 +99,6 @@ class SpatialHashTable:
                 cell = (cell_center[0] + dr, cell_center[1] + dc)
                 if cell in self.table:
                     for r, c, obj in self.table[cell]:
-                        # Verificar distancia real (Manhattan)
                         if abs(r - row) + abs(c - col) <= radius:
                             results.append((r, c, obj))
         
@@ -155,32 +154,25 @@ class FastIDHashTable:
         return False
     
     def contains(self, key: str) -> bool:
-        """Verifica si existe una clave - O(1) amortizado"""
         return key in self._table
     
     def keys(self) -> List[str]:
-        """Retorna todas las claves - O(n)"""
         return list(self._table.keys())
     
     def values(self) -> List[Any]:
-        """Retorna todos los valores - O(n)"""
         return list(self._table.values())
     
     def items(self) -> List[Tuple[str, Any]]:
-        """Retorna todos los pares (clave, valor) - O(n)"""
         return list(self._table.items())
     
     def clear(self):
-        """Limpia la tabla - O(1)"""
         self._table.clear()
         self._count = 0
     
     def __len__(self) -> int:
-        """Retorna el número de elementos - O(1)"""
         return self._count
     
     def __contains__(self, key: str) -> bool:
-        """Permite usar 'in' para verificar existencia - O(1)"""
         return key in self._table
 
 
@@ -226,8 +218,8 @@ def hash_string(s: str) -> int:
     """
     h = 5381
     for char in s:
-        h = ((h << 5) + h) + ord(char)  # h * 33 + char
-    return h & 0xFFFFFFFF  # Mantener en rango de 32 bits
+        h = ((h << 5) + h) + ord(char)
+    return h & 0xFFFFFFFF 
 
 
 class BloomFilter:

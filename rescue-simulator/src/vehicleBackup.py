@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Tuple, List, Dict
 
-##Falta agregar el atributo collected_value que cada vez que se recoge una carga, suma los puntos
-
 TRUCK_COLOR = (30, 144, 255)
 JEEP_COLOR = (34, 139, 34)
 CAR_COLOR = (240, 240, 240)
@@ -89,10 +87,8 @@ class Vehicle:
         if not self.can_pick(item_type):
             return False
 
-        # consumir un viaje
         self.trips_done_since_base += 1
 
-        # acumular valor recogido (si no se da 'value', asumimos 1 unidad)
         added = value if isinstance(value, int) and value > 0 else 1
         self.collected_value += added
         self.capacity -= 1
@@ -218,7 +214,7 @@ class VehicleManager:
         return dict(self.vehicles)
 
     def check_vehicle_collision(self) -> List[Tuple[str, str]]:
-        collisions = [] #Lista que guarda las colisiones
+        collisions = []
         active_vehicles = {
             vehicle_id: vehicle for vehicle_id, vehicle in self.vehicles.items()
             if vehicle.status not in ["in_base", "destroyed"]
