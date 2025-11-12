@@ -12,6 +12,22 @@ from pathlib import Path
 import sqlite3
 from persistence import PersistenceManager
 
+def find_database():
+    """Busca la base de datos en múltiples ubicaciones posibles"""
+    script_dir = Path(__file__).resolve().parent
+    possible_paths = [
+        script_dir / "data" / "simulation_history.db",  # Si se ejecuta desde rescue-simulator/
+        script_dir.parent / "rescue-simulator" / "data" / "simulation_history.db",  # Si se ejecuta desde el proyecto raíz
+        Path("data/simulation_history.db"),  # Ruta relativa actual
+        Path("rescue-simulator/data/simulation_history.db"),  # Desde proyecto raíz
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return path
+    
+    return None
+
 def main():
     """Función principal"""
     
@@ -19,12 +35,14 @@ def main():
     print("  LIMPIEZA Y REINICIO DEL SISTEMA DE PERSISTENCIA")
     print("=" * 70)
     
-    # Verificar que existe la base de datos
-    db_path = Path("data/simulation_history.db")
-    if not db_path.exists():
+    # Buscar la base de datos en múltiples ubicaciones
+    db_path = find_database()
+    if db_path is None:
         print("\nℹ️  La base de datos no existe aún")
         print("   No hay nada que limpiar.")
         return
+    
+    print(f"\n📁 Base de datos encontrada: {db_path}")
     
     # Mostrar estadísticas antes
     print("\n📊 ESTADO ACTUAL:")
