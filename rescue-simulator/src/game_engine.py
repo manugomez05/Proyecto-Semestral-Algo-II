@@ -18,7 +18,6 @@ from config.strategies.player1_strategies import Strategy1
 import sys
 import importlib.util
 import os
-import pickle
 import time
 from pathlib import Path
 
@@ -46,7 +45,6 @@ class GameEngine:
         self.start_time = time.time()  # Tiempo de inicio para minas basadas en tiempo
         # Directorio raíz del proyecto (rescue-simulator)
         self._project_root = Path(__file__).resolve().parents[1]
-        self._saved_states_dir = self._project_root / 'saved_states'
         
         # Sistema de persistencia
         if PersistenceManager is not None:
@@ -115,14 +113,6 @@ class GameEngine:
         # Recrear flotas de vehículos (resetear estado de vehículos)
         self.player1.vehicles = self.player1._create_fleet()
         self.player2.vehicles = self.player2._create_fleet()
-        
-        # Limpiar estados guardados anteriores para evitar confusión
-        try:
-            if self._saved_states_dir.exists():
-                import shutil
-                shutil.rmtree(self._saved_states_dir)
-        except Exception:
-            pass  # Silenciar error, no es crítico
         
         resources = self.map.generate_random_map()
 
@@ -232,122 +222,10 @@ class GameEngine:
     def stop_game(self):
         self.state = "stopped"
 
-    def save_state(self):
-        """Guarda el estado actual de la simulación"""
-        try:
-            os.makedirs(self._saved_states_dir, exist_ok=True)
-            
-            # Guardar las estrategias temporalmente y eliminarlas antes de serializar
-            # (tienen referencias circulares que causan RecursionError)
-            strategy1 = self.player1.strategy
-            strategy2 = self.player2.strategy
-            self.player1.strategy = None
-            self.player2.strategy = None
-            
-            state = {
-                'state': self.state,
-                'tick': self.tick,
-                'start_time': self.start_time,
-                'elapsed_time': time.time() - self.start_time,
-                'player1': self.player1,
-                'player2': self.player2,
-                'map': self.map
-            }
-            final_path = self._saved_states_dir / f'state_{self.tick}.pickle'
-            temp_path = self._saved_states_dir / f'state_{self.tick}.pickle.tmp'
-            
-            # Escribir en archivo temporal y mover de forma atómica
-            with open(temp_path, 'wb') as f:
-                pickle.dump(state, f)
-                f.flush()
-                try:
-                    os.fsync(f.fileno())
-                except Exception:
-                    # os.fsync puede fallar en algunos entornos, no crítico
-                    pass
-            os.replace(str(temp_path), str(final_path))
-            
-            # Restaurar las estrategias
-            self.player1.strategy = strategy1
-            self.player2.strategy = strategy2
-            
-            # Verificar que el archivo existe
-            if final_path.exists():
-                return str(final_path)
-            else:
-                return None
-        except Exception:
-            # Asegurar que restauramos las estrategias incluso si hay error
-            try:
-                if 'strategy1' in locals():
-                    self.player1.strategy = strategy1
-                if 'strategy2' in locals():
-                    self.player2.strategy = strategy2
-            except:
-                pass
-            return None
-
-    def load_state(self, filename):
-        """Carga un estado previo de la simulación"""
-        try:
-            with open(filename, 'rb') as f:
-                state = pickle.load(f)
-            # asignar estado solo después de cargar correctamente
-            self.state = state['state']
-            self.tick = state['tick']
-            self.start_time = time.time() - state['elapsed_time']
-            self.player1 = state['player1']
-            self.player2 = state['player2']
-            self.map = state['map']
-            
-            # Actualizar el tick en el mapa después de cargar
-            self.map.current_tick = self.tick
-            
-            # Restaurar las estrategias (no se guardan por referencias circulares)
-            try:
-                self.player1.strategy = Strategy1(self.map.cols, self.map.rows, self.map, self.player2)
-                self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
-            except Exception:
-                self.player1.strategy = None
-                self.player2.strategy = None
-            
-            return True
-        except (EOFError, pickle.UnpicklingError):
-            return False
-        except Exception:
-            return False
-
     def step_forward(self):
         """Avanza un paso en la simulación"""
         # Ejecutar un único tick aunque el motor esté en pausa
-        # (update ya guarda el estado cuando force=True)
         self.update(force=True)
-        
-    def step_backward(self):
-        """Retrocede un paso en la simulación"""
-        # Verificar que exista la carpeta de estados
-        if not self._saved_states_dir.exists():
-            return
-        
-        if self.tick <= 0:
-            return
-        
-        # Buscar el estado guardado más cercano antes del tick actual
-        target_tick = self.tick - 1
-        filename = str(self._saved_states_dir / f'state_{target_tick}.pickle')
-        
-        if os.path.exists(filename):
-            ok = self.load_state(filename)
-            if ok:
-                return
-        
-        # Si no existe ese tick exacto, buscar el más cercano anterior
-        for t in range(target_tick - 1, -1, -1):
-            filename = str(self._saved_states_dir / f'state_{t}.pickle')
-            if os.path.exists(filename):
-                ok = self.load_state(filename)
-                if ok:
-                    break
     
     def _check_game_over_conditions(self):
         """Verifica si se cumplen las condiciones de fin de juego"""
@@ -499,12 +377,6 @@ class GameEngine:
             
         if self.state != "running" and not force:
             return
-        
-        # Guardar el estado actual antes de avanzar (para poder retroceder)
-        # Guardar siempre en modo paso a paso, o cada 5 ticks en modo automático
-        should_save = force or (self.state == "running" and self.tick % 5 == 0)
-        if should_save:
-            self.save_state()
 
         # Incrementar el contador de tiempo (tick)
         self.tick += 1

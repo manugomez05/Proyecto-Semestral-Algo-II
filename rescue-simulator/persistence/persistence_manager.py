@@ -6,10 +6,10 @@ Coordina todos los componentes de persistencia y proporciona
 una interfaz unificada para el GameEngine.
 
 Responsabilidades:
-- Coordinar ConfigManager, StateManager, SimulationHistory y CSVExporter
+- Coordinar ConfigManager y SimulationHistory
 - Proporcionar interfaz simple para GameEngine
 - Gestionar el ciclo completo de una simulación
-- Automatizar guardados y recuperación
+- Registrar partidas en base de datos
 """
 
 from typing import Optional, Dict, Any, List
@@ -18,9 +18,7 @@ from datetime import datetime
 import uuid
 
 from .config_manager import ConfigManager
-from .state_manager import StateManager
 from .simulation_history import SimulationHistory
-from .csv_exporter import CSVExporter
 
 
 class PersistenceManager:
@@ -43,16 +41,10 @@ class PersistenceManager:
         
         # Inicializar componentes
         self.config_manager = ConfigManager(self.base_dir / "config")
-        self.state_manager = StateManager(self.base_dir / "saved_states")
         self.history = SimulationHistory(self.base_dir / "data" / "simulation_history.db")
-        self.csv_exporter = CSVExporter(self.base_dir / "exports")
         
         # ID de simulación actual
         self.current_simulation_id: Optional[str] = None
-        
-        # Auto-save configurado
-        self.auto_save_enabled = True
-        self.auto_save_interval = 5  # Cada cuántos ticks guardar
         
     def start_new_simulation(self, config: Dict[str, Any]) -> str:
         """
@@ -81,41 +73,6 @@ class PersistenceManager:
         )
         
         return simulation_id
-    
-    def save_simulation_state(self, state_data: Dict[str, Any], tick: int,
-                             is_checkpoint: bool = False) -> Optional[str]:
-        """
-        Guarda el estado actual de la simulación.
-        
-        Args:
-            state_data: Estado completo del juego
-            tick: Tick actual
-            is_checkpoint: Si es checkpoint de recuperación
-            
-        Returns:
-            Path del archivo guardado o None si falla
-        """
-        if self.current_simulation_id is None:
-            return None
-        
-        return self.state_manager.save_state(
-            state_data,
-            tick,
-            self.current_simulation_id,
-            is_checkpoint
-        )
-    
-    def load_simulation_state(self, filepath: str) -> Optional[Dict[str, Any]]:
-        """
-        Carga un estado de simulación.
-        
-        Args:
-            filepath: Path al archivo de estado
-            
-        Returns:
-            Estado cargado o None si falla
-        """
-        return self.state_manager.load_state(filepath)
     
     def finish_simulation(self, total_ticks: int, winner: str,
                          final_score_p1: int, final_score_p2: int,
@@ -215,117 +172,6 @@ class PersistenceManager:
             event_data
         )
     
-    def get_latest_checkpoint(self) -> Optional[str]:
-        """
-        Obtiene el último checkpoint guardado.
-        
-        Returns:
-            Path al checkpoint más reciente o None
-        """
-        return self.state_manager.get_latest_checkpoint()
-    
-    def find_state_by_tick(self, target_tick: int) -> Optional[str]:
-        """
-        Busca un estado por tick.
-        
-        Args:
-            target_tick: Tick objetivo
-            
-        Returns:
-            Path al estado más cercano
-        """
-        return self.state_manager.find_state_by_tick(
-            target_tick,
-            self.current_simulation_id
-        )
-    
-    def list_snapshots(self) -> List[Dict[str, Any]]:
-        """
-        Lista snapshots de la simulación actual.
-        
-        Returns:
-            Lista de snapshots
-        """
-        return self.state_manager.list_snapshots(self.current_simulation_id)
-    
-    def list_manual_saves(self) -> List[Dict[str, Any]]:
-        """
-        Lista guardados manuales.
-        
-        Returns:
-            Lista de guardados
-        """
-        return self.state_manager.list_manual_saves()
-    
-    def save_manual(self, state_data: Dict[str, Any],
-                   name: str, description: Optional[str] = None) -> Optional[str]:
-        """
-        Guarda estado manualmente.
-        
-        Args:
-            state_data: Estado a guardar
-            name: Nombre del guardado
-            description: Descripción opcional
-            
-        Returns:
-            Path del archivo guardado
-        """
-        return self.state_manager.save_manual(state_data, name, description)
-    
-    def load_manual(self, filename: str) -> Optional[Dict[str, Any]]:
-        """
-        Carga un guardado manual.
-        
-        Args:
-            filename: Nombre del archivo
-            
-        Returns:
-            Estado cargado
-        """
-        return self.state_manager.load_manual(filename)
-    
-    def export_current_simulation_csv(self) -> Optional[Dict[str, str]]:
-        """
-        Exporta la simulación actual a CSV.
-        
-        Returns:
-            Diccionario con paths de archivos generados
-        """
-        if self.current_simulation_id is None:
-            return None
-        
-        # Obtener datos de la simulación
-        sim_data = self.history.get_simulation(self.current_simulation_id)
-        
-        if sim_data is None:
-            return None
-        
-        # Exportar a CSV
-        return self.csv_exporter.export_complete_simulation(sim_data)
-    
-    def export_all_simulations_csv(self, limit: int = 50) -> str:
-        """
-        Exporta todas las simulaciones a CSV.
-        
-        Args:
-            limit: Número máximo de simulaciones a exportar
-            
-        Returns:
-            Path al archivo CSV
-        """
-        simulations = self.history.list_simulations(limit)
-        return self.csv_exporter.export_simulations(simulations)
-    
-    def export_summary_csv(self) -> str:
-        """
-        Exporta resumen estadístico a CSV.
-        
-        Returns:
-            Path al archivo CSV
-        """
-        summary = self.history.get_statistics_summary()
-        return self.csv_exporter.export_summary_statistics(summary)
-    
     def get_simulation_history(self, limit: int = 50) -> List[Dict[str, Any]]:
         """
         Obtiene el historial de simulaciones.
@@ -347,113 +193,19 @@ class PersistenceManager:
         """
         return self.history.get_statistics_summary()
     
-    def cleanup_old_data(self, days_to_keep: int = 30,
-                        keep_snapshots: int = 50) -> Dict[str, int]:
+    def cleanup_old_data(self, days_to_keep: int = 30) -> Dict[str, int]:
         """
-        Limpia datos antiguos.
+        Limpia datos antiguos de la base de datos.
         
         Args:
             days_to_keep: Días de simulaciones a mantener
-            keep_snapshots: Número de snapshots a mantener
             
         Returns:
             Diccionario con cantidad de elementos eliminados
         """
         deleted = {
-            "simulations": self.history.cleanup_old_simulations(days_to_keep),
-            "snapshots": 0
+            "simulations": self.history.cleanup_old_simulations(days_to_keep)
         }
-        
-        # Limpiar snapshots
-        self.state_manager.cleanup_old_snapshots(keep_snapshots)
-        self.state_manager.cleanup_checkpoints(10)
         
         return deleted
     
-    def get_storage_info(self) -> Dict[str, Any]:
-        """
-        Obtiene información sobre el almacenamiento usado.
-        
-        Returns:
-            Diccionario con información de almacenamiento
-        """
-        sizes = self.state_manager.get_total_size()
-        
-        # Convertir bytes a formato legible
-        def format_size(bytes_size):
-            for unit in ['B', 'KB', 'MB', 'GB']:
-                if bytes_size < 1024.0:
-                    return f"{bytes_size:.2f} {unit}"
-                bytes_size /= 1024.0
-            return f"{bytes_size:.2f} TB"
-        
-        return {
-            "snapshots_bytes": sizes["snapshots"],
-            "snapshots_formatted": format_size(sizes["snapshots"]),
-            "manual_saves_bytes": sizes["manual_saves"],
-            "manual_saves_formatted": format_size(sizes["manual_saves"]),
-            "checkpoints_bytes": sizes["checkpoints"],
-            "checkpoints_formatted": format_size(sizes["checkpoints"]),
-            "total_bytes": sizes["total"],
-            "total_formatted": format_size(sizes["total"])
-        }
-    
-    def resume_last_simulation(self) -> Optional[Dict[str, Any]]:
-        """
-        Intenta reanudar la última simulación interrumpida.
-        
-        Returns:
-            Estado de la última simulación o None
-        """
-        checkpoint = self.get_latest_checkpoint()
-        
-        if checkpoint is None:
-            return None
-        
-        state = self.load_simulation_state(checkpoint)
-        
-        if state is not None:
-            # Restaurar ID de simulación
-            self.current_simulation_id = state.get("simulation_id")
-        
-        return state
-    
-    def create_checkpoint(self, state_data: Dict[str, Any], tick: int) -> Optional[str]:
-        """
-        Crea un checkpoint de recuperación automática.
-        
-        Args:
-            state_data: Estado a guardar
-            tick: Tick actual
-            
-        Returns:
-            Path del checkpoint creado
-        """
-        return self.state_manager.create_checkpoint(state_data, tick)
-    
-    def should_auto_save(self, tick: int) -> bool:
-        """
-        Determina si debe guardar automáticamente en este tick.
-        
-        Args:
-            tick: Tick actual
-            
-        Returns:
-            True si debe guardar
-        """
-        if not self.auto_save_enabled:
-            return False
-        
-        return tick % self.auto_save_interval == 0
-    
-    def set_auto_save_config(self, enabled: bool, interval: int = 5):
-        """
-        Configura el auto-guardado.
-        
-        Args:
-            enabled: Si está habilitado
-            interval: Intervalo de ticks entre guardados
-        """
-        self.auto_save_enabled = enabled
-        self.auto_save_interval = max(1, interval)
-

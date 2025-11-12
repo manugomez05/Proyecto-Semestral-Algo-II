@@ -77,18 +77,13 @@ class Visualization:
         # Cuando INIT está visible: posiciones originales
         # Cuando INIT no está visible: posiciones centradas (desplazadas -85px a la izquierda)
         self.play_button = Button(str(assets_path / 'playBtn.png'), 'bottom', (-50,0), partial(self.engine.start_game))
-        self.backward_button = Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (80,0), partial(self.engine.step_backward))
-        self.forward_button = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (170,0), partial(self.engine.step_forward))
-        self.stop_button = Button(str(assets_path / 'stopBtn.png'), 'bottom', (270,0), partial(self.engine.stop_game))
+        self.forward_button = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (80,0), partial(self.engine.step_forward))
+        self.stop_button = Button(str(assets_path / 'stopBtn.png'), 'bottom', (170,0), partial(self.engine.stop_game))
         
         # Posiciones alternativas (centradas) cuando INIT no está visible
         self.play_button_centered = Button(str(assets_path / 'playBtn.png'), 'bottom', (-135,0), partial(self.engine.start_game))
-        self.backward_button_centered = Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (-5,0), partial(self.engine.step_backward))
-        self.forward_button_centered = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (85,0), partial(self.engine.step_forward))
-        self.stop_button_centered = Button(str(assets_path / 'stopBtn.png'), 'bottom', (185,0), partial(self.engine.stop_game))
-        
-        # Botón save siempre en la misma posición
-        self.save_button = Button(str(assets_path / 'saveBtn.png'), 'bottomLeft', (40,0), """partial(self.engine.save_game)""")
+        self.forward_button_centered = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (-5,0), partial(self.engine.step_forward))
+        self.stop_button_centered = Button(str(assets_path / 'stopBtn.png'), 'bottom', (85,0), partial(self.engine.stop_game))
         
         # Botón de salida (X) en la esquina superior derecha (misma posición relativa que el botón de guardado)
         self.exit_button = TextButton('X', 'topRight', (-40, 0), exit, font_size=32, color=(255, 80, 80), hover_color=(255, 120, 120))
@@ -109,18 +104,13 @@ class Visualization:
                 self.init_button.handle_event(event)
                 # Usar botones en posiciones normales (con INIT visible)
                 self.play_button.handle_event(event)
-                self.backward_button.handle_event(event)
                 self.forward_button.handle_event(event)
                 self.stop_button.handle_event(event)
             else:
                 # Usar botones centrados (sin INIT)
                 self.play_button_centered.handle_event(event)
-                self.backward_button_centered.handle_event(event)
                 self.forward_button_centered.handle_event(event)
                 self.stop_button_centered.handle_event(event)
-            
-            # Botón save siempre disponible
-            self.save_button.handle_event(event)
             
             # Botón de salida siempre disponible
             self.exit_button.handle_event(event)
@@ -146,18 +136,13 @@ class Visualization:
                 # Dibujar INIT y botones en posición normal
                 self.init_button.draw(self.screen)
                 self.play_button.draw(self.screen)
-                self.backward_button.draw(self.screen)
                 self.forward_button.draw(self.screen)
                 self.stop_button.draw(self.screen)
             else:
                 # Dibujar botones centrados (sin INIT)
                 self.play_button_centered.draw(self.screen)
-                self.backward_button_centered.draw(self.screen)
                 self.forward_button_centered.draw(self.screen)
                 self.stop_button_centered.draw(self.screen)
-            
-            # Botón save siempre visible
-            self.save_button.draw(self.screen)
         
         # Botón de salida siempre visible
         self.exit_button.draw(self.screen)
@@ -459,10 +444,8 @@ class Visualization:
         # Dibujar botones en la pantalla de game over (con INIT visible)
         self.init_button.draw(self.screen)
         self.play_button.draw(self.screen)
-        self.backward_button.draw(self.screen)
         self.forward_button.draw(self.screen)
         self.stop_button.draw(self.screen)
-        self.save_button.draw(self.screen)
         self.exit_button.draw(self.screen)
     
     def _draw_player_stats(self, player_info, x, y, width, info_font, small_font, color):
