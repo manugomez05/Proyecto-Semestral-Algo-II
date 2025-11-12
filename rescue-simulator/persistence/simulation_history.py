@@ -37,6 +37,10 @@ class SimulationHistory:
             data_dir = project_root / "data"
             data_dir.mkdir(exist_ok=True)
             db_path = data_dir / "simulation_history.db"
+        else:
+            # Si se pasa un path explícito, asegurarse de que el directorio padre existe
+            db_path = Path(db_path)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
         
         self.db_path = Path(db_path)
         self._init_database()
