@@ -33,8 +33,6 @@ def main():
         engine.update()
         view.render()
         pygame.time.Clock().tick(FPS)
-
-        #print(pygame.mouse.get_pos())
     
 
 if __name__ == "__main__":

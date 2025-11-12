@@ -13,7 +13,7 @@ from src import SCREEN_WIDTH, SCREEN_HEIGHT, PALETTE_1
 import pygame
 from pathlib import Path
 import pickle
-from src.vehicle import VehicleManager # suponiendo que estas clases ya existen
+from src.vehicle import VehicleManager
 
 class Player:
     def __init__(self, name: str, base_position: tuple, strategy=None):
@@ -27,8 +27,8 @@ class Player:
         self.name = name
         self.base_position = base_position
         self.score = 0
-        self.strategy = strategy  # Estrategia global del jugador
-        self.vehicles = self._create_fleet()  # Lista de vehículos del jugador
+        self.strategy = strategy 
+        self.vehicles = self._create_fleet()  
 
     # -----------------------------------------------------
     # Creación de la flota (10 vehículos en total)
@@ -86,14 +86,12 @@ class Player:
     def __getstate__(self):
         """Método especial para pickle"""
         state = self.__dict__.copy()
-        # Eliminamos la referencia a pygame.font que no es serializable
         state['_font'] = None
         return state
         
     def __setstate__(self, state):
         """Método especial para pickle"""
         self.__dict__.update(state)
-        # Recreamos la fuente al deserializar
         root_path = Path(__file__).resolve().parents[1]
         font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
         self._font = pygame.font.Font(str(font_path), 14)
@@ -102,7 +100,7 @@ class Player:
         return self.vehicles.get(vehicle_id)
     
     def drawPlayerBase(self, surface, x, y):
-        root_path = Path(__file__).resolve().parents[1]  # sube de src/ a rescue-simulator/
+        root_path = Path(__file__).resolve().parents[1]
         font_path = root_path / "assets" / "Press_Start_2P" / "PressStart2P-Regular.ttf"
 
         if not hasattr(self, '_font'):
@@ -120,22 +118,16 @@ class Player:
         pygame.draw.line(surface, PALETTE_1, (x, 200), (x, 650), 2)
 
         for key, vehicle in self.vehicles.items():
-            # Dibujar imagen del vehículo en lugar del color
             img_path = getattr(vehicle, "img_path", None)
             if img_path:
                 try:
                     img = pygame.image.load(img_path).convert_alpha()
-                    img = pygame.transform.scale(img, (64, 64))  # Tamaño el doble de grande
-                    # Cada jugador tiene sus propias imágenes que ya apuntan hacia el centro
-                    # Jugador_1: usa *1.png (apuntan a la derecha →)
-                    # Jugador_2: usa *2.png (apuntan a la izquierda ←)
+                    img = pygame.transform.scale(img, (64, 64))
                     surface.blit(img, (x+20, margin-16))
                 except:
-                    # Fallback: dibujar rectángulo con color si hay error
                     rect = pygame.Rect(x+20, margin, 64, 64)
                     pygame.draw.rect(surface, vehicle.color, rect)
             else:
-                # Fallback: dibujar rectángulo con color
                 rect = pygame.Rect(x+20, margin, 64, 64)
                 pygame.draw.rect(surface, vehicle.color, rect)
 

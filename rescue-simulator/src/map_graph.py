@@ -74,23 +74,19 @@ class MapGraph:
             for col in range(self.cols):
                 node = self.grid[row][col]
 
-                #Vecino arriba
+               
                 if row>0:
                     node.add_neighbor(self.grid[row-1][col])
-                #Vecino abajo
                 if row < self.rows -1:
                     node.add_neighbor(self.grid[row+1][col])
-                #Vecino izq
                 if col>0:
                     node.add_neighbor(self.grid[row][col-1])
-                #Vecino der
                 if col < self.cols - 1:
                     node.add_neighbor(self.grid[row][col + 1])
 
-
     def get_node(self, row, col):
         """Devuelve el nodo en la posicion (row, col) - Optimizado con hash table O(1)"""
-        # Usar hash table para acceso directo O(1) en lugar de acceso a array 2D
+        # Usar hash table para acceso directo O(1)
         return self.nodes_by_position.get((row, col))
     
     def set_node_state(self, row, col, state, content = None):
@@ -104,7 +100,6 @@ class MapGraph:
             if node.state == "vehicle" and pos in self.vehicles_by_position:
                 del self.vehicles_by_position[pos]
             
-            # Actualizar nodo
             node.state = state
             node.content = content if content else {}
             
@@ -160,13 +155,11 @@ class MapGraph:
         # Iterar solo sobre recursos activos en la hash table
         for pos, content in self.resources_by_position.items():
             r, c = pos
-            # Filtrar por tipo si se especifica
             if resource_type:
                 res_type = content.get("tipo") or content.get("subtype")
                 if res_type != resource_type:
                     continue
-            
-            # Distancia Manhattan
+        
             dist = abs(r - r0) + abs(c - c0)
             if dist < best_dist:
                 best_dist = dist
@@ -230,18 +223,15 @@ class MapGraph:
                                     should_clear = True
                                     break
                             
-                            # Si la lista queda vacía, limpiar el nodo
                             if not content:
                                 should_clear = True
                             else:
-                                # Si quedan vehículos, no limpiar el nodo completamente
                                 should_clear = False
                         elif isinstance(content, dict):
                             vid = content.get("id")
                             if vid and ((isinstance(vehicle, dict) and vehicle.get("id") == vid) or (not isinstance(vehicle, dict) and getattr(vehicle, "id", None) == vid)):
                                 should_clear = True
                         else:
-                            # content puede ser referencia directa al objeto vehicle
                             if not isinstance(vehicle, dict) and getattr(content, "id", None) == getattr(vehicle, "id", None):
                                 should_clear = True
                     except Exception:
@@ -268,7 +258,6 @@ class MapGraph:
                         if old_pos_tuple in self.vehicles_by_position:
                             del self.vehicles_by_position[old_pos_tuple]
 
-        # Obtener destino
         node = self.get_node(new_row, new_col)
         if node is None:
             return False
@@ -372,11 +361,8 @@ class MapGraph:
                         else:
                             if isinstance(vehicle, dict):
                                 vehicle["position"] = (new_row, new_col)
-                        
-                        # Nota: Los vehículos del mismo equipo no colisionan, continúan su camino
                         return True
                     else:
-                        # Vehículos de equipos diferentes: destruir ambos
                         if existing_vehicle_obj and hasattr(existing_vehicle_obj, "status"):
                             existing_vehicle_obj.status = "destroyed"
                             existing_vehicle_obj.collected_value = 0
@@ -384,24 +370,22 @@ class MapGraph:
                         if veh_obj and hasattr(veh_obj, "status"):
                             veh_obj.status = "destroyed"
                             veh_obj.collected_value = 0
-                        
-                        # Limpiar el nodo
+            
                         pos = (new_row, new_col)
                         # Preservar el estado de la base si estaba en una base
                         if node.state in ("base_p1", "base_p2"):
-                            # Mantener el estado de la base pero limpiar el contenido del vehículo
                             node.content = {}
                             # Limpiar hash table de vehículos
                             if pos in self.vehicles_by_position:
                                 del self.vehicles_by_position[pos]
-                            return False  # No permitir el movimiento
+                            return False
                         else:
                             node.state = "empty"
                             node.content = {}
                             # Limpiar hash table de vehículos
                             if pos in self.vehicles_by_position:
                                 del self.vehicles_by_position[pos]
-                            return False  # No permitir el movimiento
+                            return False 
         
         # Guardar el estado original de la base si existe
         original_base_state = None
@@ -410,8 +394,7 @@ class MapGraph:
 
         # Si en la celda hay un recurso, verificar si el vehículo puede recogerlo
         resource = node.content if node and node.state == "resource" else None
-        resource_picked = False  # Flag para saber si se recogió el recurso
-        
+        resource_picked = False 
         if resource:
             # Determinar tipo y valor del recurso (soportar dict y objeto)
             if isinstance(resource, dict):
@@ -646,18 +629,15 @@ class MapGraph:
                     if mine.contains((r,c), tick=0): #tick inicial
                         self.set_node_state(r,c, "mine", {"type": mine.type.name})
         
-        #Obtener posiciones ocupadas por minas
-        occupied_positions = set() #conjunto con elementos únicos 
+        occupied_positions = set()
         for mine in self.mine_manager.all():
             for r in range(self.rows):
                 for c in range(self.cols):
                     if mine.contains((r,c), tick=0):
                         occupied_positions.add((r,c))
 
-        #Generar recursos evitando minas
         resources = generate_resources(self.rows, self.cols, occupied_positions)
         
-        # guardar referencia a la lista original de objetos recursos
         self.resources = resources
         
         #Marcar nodos con recursos

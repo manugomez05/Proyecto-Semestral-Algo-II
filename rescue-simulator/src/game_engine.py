@@ -10,8 +10,6 @@ Responsabilidades:
 - Actualizar el estado del juego (vehículos, recursos, minas, etc).
 - Procesar las acciones de los botones (iniciar, detener, etc).
 """
-
-
 from src.map_manager import MapManager
 from src.player import Player
 from config.strategies.player1_strategies import Strategy1
@@ -27,9 +25,9 @@ try:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from persistence.persistence_manager import PersistenceManager
 except ImportError:
-    PersistenceManager = None  # Si no está disponible, continuar sin persistencia
+    PersistenceManager = None
 
-# Importar Strategy2 desde player2.strategies.py (nombre con punto requiere importación especial)
+# Importar Strategy2
 spec = importlib.util.spec_from_file_location(
     "player2_strategies", 
     os.path.join(os.path.dirname(__file__), "..", "config", "strategies", "player2.strategies.py")
@@ -57,17 +55,14 @@ class GameEngine:
         else:
             self.persistence = None
         
-        # Sistema de debug: lista de eventos (colisiones, destrucciones, etc.)
         self.debug_events = []
-        self.max_debug_events = 15  # Máximo de eventos a mostrar
+        self.max_debug_events = 15 
         
-        # Estado del juego terminado
-        self.game_over_info = None  # Información del ganador
+        self.game_over_info = None 
         
         # Sistema de animaciones de colisiones
-        self.collision_animations = []  # Lista de animaciones activas
+        self.collision_animations = [] 
 
-        # Generar posiciones
         base_positions = self.map.generate_bases()
 
         # Crear jugadores con sus bases
@@ -80,7 +75,7 @@ class GameEngine:
         """Agrega un evento de debug para mostrar en pantalla"""
         event = {
             'tick': self.tick,
-            'type': event_type,  # 'collision', 'mine', 'ghost', 'resource', etc.
+            'type': event_type, 
             'message': message,
             'color': color
         }
@@ -100,8 +95,8 @@ class GameEngine:
         animation = {
             'position': position,
             'type': animation_type,
-            'frame': 0,  # Frame actual de la animación
-            'max_frames': 20,  # Duración total de la animación en frames
+            'frame': 0,  
+            'max_frames': 20, 
         }
         self.collision_animations.append(animation)
     
@@ -120,16 +115,14 @@ class GameEngine:
     
     def init_game(self):
         self.map.clear_map()
-        self.debug_events = []  # Limpiar eventos al iniciar nuevo juego
-        self.collision_animations = []  # Limpiar animaciones al iniciar nuevo juego
-        self.tick = 0  # Resetear tick a 0
-        self.start_time = time.time()  # Resetear tiempo de inicio
-        self.game_over_info = None  # Resetear información de game over
-        # Variables de timeout para detectar juegos estancados
+        self.debug_events = []  
+        self.collision_animations = []  
+        self.tick = 0  
+        self.start_time = time.time() 
+        self.game_over_info = None 
         self._last_score_change_tick = 0
         self._last_total_score = 0
         
-        # Resetear puntajes de los jugadores
         self.player1.score = 0
         self.player2.score = 0
         
@@ -137,13 +130,12 @@ class GameEngine:
         self.player1.vehicles = self.player1._create_fleet()
         self.player2.vehicles = self.player2._create_fleet()
         
-        # Limpiar estados guardados anteriores para evitar confusión
         try:
             if self._saved_states_dir.exists():
                 import shutil
                 shutil.rmtree(self._saved_states_dir)
         except Exception:
-            pass  # Silenciar error, no es crítico
+            pass 
         
         resources = self.map.generate_random_map()
 
@@ -152,7 +144,7 @@ class GameEngine:
 
         # Asignar estrategias a los jugadores
         try:
-            # Estrategia 1 para player1: motos destruyen camiones, resto usa BFS
+            # Estrategia 1 para player1: Usa BFS
             self.player1.strategy = Strategy1(self.map.cols, self.map.rows, self.map, self.player2)
             
             # Estrategia 2 para player2: usa Dijkstra
@@ -161,10 +153,8 @@ class GameEngine:
             self.player1.strategy = None
             self.player2.strategy = None
 
-        # Inicializar vehículos en la base
         self._initialize_vehicles_at_base()
         
-        # Iniciar registro de simulación en la base de datos
         if self.persistence is not None:
             try:
                 config = {
@@ -175,7 +165,7 @@ class GameEngine:
                 }
                 self.persistence.start_new_simulation(config)
             except Exception:
-                pass  # Si falla, continuar sin persistencia
+                pass
 
         self.state = "init"
         
@@ -190,57 +180,44 @@ class GameEngine:
         base_positions_p1 = self.map.get_base_positions_set()
         base_positions_p2 = self.map.get_base_positions_set()
         
-        # Para player1: usar posiciones de la base izquierda (col < 2)
         p1_base_cells = [(row, col) for row, col in base_positions_p1 if col < 2]
-        # Para player2: usar posiciones de la base derecha (col >= cols - 2)
         p2_base_cells = [(row, col) for row, col in base_positions_p2 if col >= self.map.cols - 2]
         
-        # Colocar vehículos de player1 en su base y asignar posición específica
         vehicle_index = 0
-        used_positions = set()  # Para evitar superposiciones
+        used_positions = set() 
         for vehicle_id, vehicle in self.player1.vehicles.items():
             if vehicle_index < len(p1_base_cells):
                 base_row, base_col = p1_base_cells[vehicle_index]
                 
-                # Verificar que la posición no esté ocupada
                 while (base_row, base_col) in used_positions and vehicle_index < len(p1_base_cells) - 1:
                     vehicle_index += 1
                     base_row, base_col = p1_base_cells[vehicle_index]
                 
                 used_positions.add((base_row, base_col))
                 
-                # Asignar posición específica de base al vehículo
                 vehicle.base_position = (base_row, base_col)
-                # Asegurar que el vehículo esté en estado "in_base" antes de colocarlo
                 vehicle.status = "in_base"
-                # Colocar vehículo en la base usando place_vehicle
                 try:
                     self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
                 except Exception as e:
-                    # Fallback: actualizar posición directamente
                     vehicle.position = (base_row, base_col)
                     vehicle.status = "in_base"
                 vehicle_index += 1
         
-        # Colocar vehículos de player2 en su base y asignar posición específica
         vehicle_index = 0
-        used_positions_p2 = set()  # Para evitar superposiciones
+        used_positions_p2 = set() 
         for vehicle_id, vehicle in self.player2.vehicles.items():
             if vehicle_index < len(p2_base_cells):
                 base_row, base_col = p2_base_cells[vehicle_index]
                 
-                # Verificar que la posición no esté ocupada
                 while (base_row, base_col) in used_positions_p2 and vehicle_index < len(p2_base_cells) - 1:
                     vehicle_index += 1
                     base_row, base_col = p2_base_cells[vehicle_index]
                 
                 used_positions_p2.add((base_row, base_col))
                 
-                # Asignar posición específica de base al vehículo
                 vehicle.base_position = (base_row, base_col)
-                # Asegurar que el vehículo esté en estado "in_base" antes de colocarlo
                 vehicle.status = "in_base"
-                # Colocar vehículo en la base usando place_vehicle
                 try:
                     self.map.graph.place_vehicle(vehicle, base_row, base_col, player1=self.player1, player2=self.player2)
                 except Exception as e:
@@ -251,8 +228,7 @@ class GameEngine:
 
     def start_game(self):
         self.state = "running"
-        #self.state = "game_over"
-        self.start_time = time.time()  # Reiniciar tiempo al iniciar
+        self.start_time = time.time()
         self.add_debug_event('system', "▶️ Simulación iniciada", (100, 255, 100))
 
     def stop_game(self):
@@ -264,8 +240,6 @@ class GameEngine:
         try:
             os.makedirs(self._saved_states_dir, exist_ok=True)
             
-            # Guardar las estrategias temporalmente y eliminarlas antes de serializar
-            # (tienen referencias circulares que causan RecursionError)
             strategy1 = self.player1.strategy
             strategy2 = self.player2.strategy
             self.player1.strategy = None
@@ -319,7 +293,6 @@ class GameEngine:
         try:
             with open(filename, 'rb') as f:
                 state = pickle.load(f)
-            # asignar estado solo después de cargar correctamente
             self.state = state['state']
             self.tick = state['tick']
             self.start_time = time.time() - state['elapsed_time']
@@ -330,7 +303,6 @@ class GameEngine:
             # Actualizar el tick en el mapa después de cargar
             self.map.current_tick = self.tick
             
-            # Restaurar las estrategias (no se guardan por referencias circulares)
             try:
                 self.player1.strategy = Strategy1(self.map.cols, self.map.rows, self.map, self.player2)
                 self.player2.strategy = Strategy2(self.map.cols, self.map.rows, self.map, self.player1)
@@ -346,20 +318,17 @@ class GameEngine:
 
     def step_forward(self):
         """Avanza un paso en la simulación"""
-        # Ejecutar un único tick aunque el motor esté en pausa
-        # (update ya guarda el estado cuando force=True)
         self.update(force=True)
         self.add_debug_event('system', f"⏩ Avanzado a tick {self.tick}", (100, 200, 255))
         
     def step_backward(self):
         """Retrocede un paso en la simulación"""
-        # Verificar que exista la carpeta de estados
         if not self._saved_states_dir.exists():
-            self.add_debug_event('system', "❌ No hay estados guardados", (255, 100, 100))
+            self.add_debug_event('system', "No hay estados guardados", (255, 100, 100))
             return
         
         if self.tick <= 0:
-            self.add_debug_event('system', "⚠️ Ya en tick 0", (200, 200, 0))
+            self.add_debug_event('system', "Ya en tick 0", (200, 200, 0))
             return
         
         # Buscar el estado guardado más cercano antes del tick actual
@@ -369,7 +338,7 @@ class GameEngine:
         if os.path.exists(filename):
             ok = self.load_state(filename)
             if ok:
-                self.add_debug_event('system', f"⏮️ Retrocedido a tick {self.tick}", (100, 255, 100))
+                self.add_debug_event('system', f"Retrocedido a tick {self.tick}", (100, 255, 100))
                 return
         
         # Si no existe ese tick exacto, buscar el más cercano anterior
@@ -379,12 +348,12 @@ class GameEngine:
             if os.path.exists(filename):
                 ok = self.load_state(filename)
                 if ok:
-                    self.add_debug_event('system', f"⏮️ Retrocedido a tick {self.tick}", (100, 255, 100))
+                    self.add_debug_event('system', f"Retrocedido a tick {self.tick}", (100, 255, 100))
                     found = True
                     break
 
         if not found:
-            self.add_debug_event('system', "❌ No hay estados guardados", (255, 100, 100))
+            self.add_debug_event('system', "No hay estados guardados", (255, 100, 100))
     
     def _check_game_over_conditions(self):
         """Verifica si se cumplen las condiciones de fin de juego"""
@@ -413,7 +382,7 @@ class GameEngine:
         
         # El juego termina por falta de vehículos si ambos equipos no tienen vehículos activos
         if p1_active_vehicles == 0 and p2_active_vehicles == 0:
-            self.add_debug_event('system', "🏁 Fin del juego: No hay más vehículos", (255, 255, 0))
+            self.add_debug_event('system', "Fin del juego: No hay más vehículos", (255, 255, 0))
             return True, "Todos los vehículos han sido destruidos"
         
         # Contar vehículos en estado "job_done" (terminaron su trabajo)
@@ -426,17 +395,17 @@ class GameEngine:
         if p1_active_vehicles > 0 and p2_active_vehicles > 0:
             # Ambos jugadores tienen vehículos activos
             if p1_job_done == p1_active_vehicles and p2_job_done == p2_active_vehicles:
-                self.add_debug_event('system', "🏁 Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+                self.add_debug_event('system', "Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
                 return True, "Todos los vehículos han completado su trabajo"
         elif p1_active_vehicles > 0:
             # Solo jugador 1 tiene vehículos activos
             if p1_job_done == p1_active_vehicles:
-                self.add_debug_event('system', "🏁 Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+                self.add_debug_event('system', "Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
                 return True, "Todos los vehículos han completado su trabajo"
         elif p2_active_vehicles > 0:
             # Solo jugador 2 tiene vehículos activos
             if p2_job_done == p2_active_vehicles:
-                self.add_debug_event('system', "🏁 Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+                self.add_debug_event('system', "Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
                 return True, "Todos los vehículos han completado su trabajo"
         
         # El juego termina por falta de recursos solo si:
@@ -448,7 +417,7 @@ class GameEngine:
             vehicles_with_resources = p1_vehicles_with_resources + p2_vehicles_with_resources
             
             if vehicles_outside == 0 and vehicles_with_resources == 0:
-                self.add_debug_event('system', "🏁 Fin del juego: No quedan recursos ni vehículos en misión", (255, 255, 0))
+                self.add_debug_event('system', "Fin del juego: No quedan recursos ni vehículos en misión", (255, 255, 0))
                 return True, "No quedan recursos y todos los vehículos han retornado"
             else:
                 # Hay recursos sin entregar, esperar a que los vehículos regresen
@@ -465,20 +434,17 @@ class GameEngine:
             self._last_score_change_tick = self.tick
             self._last_total_score = current_total_score
         
-        # Si pasan 500 ticks sin cambio en el puntaje y hay recursos disponibles, hay un problema
         ticks_without_progress = self.tick - self._last_score_change_tick
         
-        # Alertas progresivas de inactividad
         if ticks_without_progress == 200 and resources_remaining > 0:
-            self.add_debug_event('system', f"⚠️ Sin progreso: {resources_remaining} recursos sin recoger", (255, 200, 0))
+            self.add_debug_event('system', f"Sin progreso: {resources_remaining} recursos sin recoger", (255, 200, 0))
         elif ticks_without_progress == 350 and resources_remaining > 0:
-            # Contar vehículos en base sin objetivo
             p1_idle = sum(1 for v in self.player1.vehicles.values() if v.status == "in_base")
             p2_idle = sum(1 for v in self.player2.vehicles.values() if v.status == "in_base")
-            self.add_debug_event('system', f"⚠️ P1:{p1_idle} P2:{p2_idle} vehículos inactivos", (255, 200, 0))
+            self.add_debug_event('system', f"P1:{p1_idle} P2:{p2_idle} vehículos inactivos", (255, 200, 0))
         
         if ticks_without_progress > 500 and resources_remaining > 0:
-            self.add_debug_event('system', "⏱️ Timeout: Sin progreso en 500 ticks", (255, 200, 0))
+            self.add_debug_event('system', "Timeout: Sin progreso en 500 ticks", (255, 200, 0))
             return True, f"Juego detenido por inactividad (quedan {resources_remaining} recursos)"
         
         return False, None
@@ -488,7 +454,6 @@ class GameEngine:
         p1_score = self.player1.score
         p2_score = self.player2.score
         
-        # Contar vehículos por estado para cada jugador
         p1_vehicles_status = {
             "in_base": 0,
             "in_mission": 0,
@@ -553,26 +518,20 @@ class GameEngine:
             return
         
         # Guardar el estado actual antes de avanzar (para poder retroceder)
-        # Guardar siempre en modo paso a paso, o cada 5 ticks en modo automático
         should_save = force or (self.state == "running" and self.tick % 5 == 0)
         if should_save:
             self.save_state()
 
-        # Incrementar el contador de tiempo (tick)
         self.tick += 1
-        
-        # Actualizar el tick en el mapa para que las estrategias puedan accederlo
         self.map.current_tick = self.tick
 
-        # Calcular tiempo transcurrido en segundos respecto a start_time
         current_time = time.time()
         elapsed_time = current_time - self.start_time
 
-        # Actualizar minas dinámicas (G1) basadas en ticks
         try:
             self.map.mine_manager.updateAll(self.tick, self.map.rows, self.map.cols, elapsed_time, self.map)
         except Exception:
-            pass  # Silenciar error
+            pass 
 
         # Verificar si algún vehículo está en una posición minada después de actualizar las minas
         self._check_vehicles_on_mines()
@@ -585,7 +544,7 @@ class GameEngine:
             try:
                 strategy1.update(self.player1)
             except Exception:
-                pass  # Silenciar error
+                pass 
         
         # Mover vehículos del jugador 2 usando su estrategia si está presente
         strategy2 = getattr(self.player2, "strategy", None)
@@ -593,18 +552,11 @@ class GameEngine:
             try:
                 strategy2.update(self.player2)
             except Exception:
-                pass  # Silenciar error
+                pass 
         
-        # Verificar colisiones entre vehículos de equipos distintos
         self._check_vehicle_collisions()
-        
-        # Verificar colisiones entre vehículos del mismo equipo (no deben destruirse)
         self._check_same_team_collisions()
-        
-        # Verificar consistencia de vehículos (detectar "fantasmas")
         self._check_vehicle_consistency()
-        
-        # Limpiar vehículos destruidos del mapa
         self._cleanup_destroyed_vehicles()
         
         # Verificar condiciones de fin de juego
@@ -640,14 +592,11 @@ class GameEngine:
                             vehicle_obj = vehicle_data
                         
                         if vehicle_obj and hasattr(vehicle_obj, "status") and vehicle_obj.status != "destroyed":
-                            # Verificar si la posición actual del vehículo está minada
                             if self.map.mine_manager.isCellMined((row, col), self.tick):
                                 vehicle_id = getattr(vehicle_obj, "id", "unknown")
                                 vehicle_obj.status = "destroyed"
                                 vehicle_obj.collected_value = 0
-                                # Evento de debug
-                                self.add_debug_event('mine', f"💥 {vehicle_id} destruido por mina en {(row, col)}", (255, 100, 0))
-                                # Agregar animación de colisión con mina
+                                self.add_debug_event('mine', f" {vehicle_id} destruido por mina en {(row, col)}", (255, 100, 0))
                                 self.add_collision_animation((row, col), animation_type="mine")
 
     def _check_vehicle_collisions(self):
@@ -700,7 +649,7 @@ class GameEngine:
                 if vehicles1_ids or vehicles2_ids:
                     v1_str = ", ".join(vehicles1_ids) if vehicles1_ids else "ninguno"
                     v2_str = ", ".join(vehicles2_ids) if vehicles2_ids else "ninguno"
-                    self.add_debug_event('collision', f"💥 COLISIÓN en {pos}: P1[{v1_str}] vs P2[{v2_str}]", (255, 50, 50))
+                    self.add_debug_event('collision', f"COLISIÓN en {pos}: P1[{v1_str}] vs P2[{v2_str}]", (255, 50, 50))
                     # Agregar animación de colisión entre vehículos
                     self.add_collision_animation(pos, animation_type="vehicle")
     
@@ -720,7 +669,7 @@ class GameEngine:
         for pos, vehicles in player1_positions.items():
             if len(vehicles) > 1:
                 vehicle_ids = [v.id for v in vehicles]
-                self.add_debug_event('same_team', f"⚠️ Colisión mismo equipo P1 en {pos}: {', '.join(vehicle_ids)}", (255, 200, 0))
+                self.add_debug_event('same_team', f"Colisión mismo equipo P1 en {pos}: {', '.join(vehicle_ids)}", (255, 200, 0))
         
         # Verificar colisiones dentro del equipo 2
         player2_positions = {}
@@ -736,44 +685,37 @@ class GameEngine:
         for pos, vehicles in player2_positions.items():
             if len(vehicles) > 1:
                 vehicle_ids = [v.id for v in vehicles]
-                self.add_debug_event('same_team', f"⚠️ Colisión mismo equipo P2 en {pos}: {', '.join(vehicle_ids)}", (255, 200, 0))
+                self.add_debug_event('same_team', f"Colisión mismo equipo P2 en {pos}: {', '.join(vehicle_ids)}", (255, 200, 0))
     
     def _check_vehicle_consistency(self):
         """Verifica que vehículos activos realmente existan en el mapa, marca como destruidos los 'fantasmas'"""
         for player in [self.player1, self.player2]:
             for vehicle_id, vehicle in player.vehicles.items():
-                # Solo verificar vehículos que dicen estar en misión o regresando
-                # No verificar vehículos en base, destruidos, o terminados
                 if vehicle.status not in ["in_base", "destroyed", "job_done"]:
                     pos = vehicle.position
                     
-                    # Verificar que la posición sea válida
                     if not (isinstance(pos, tuple) and len(pos) == 2):
                         vehicle.status = "destroyed"
                         vehicle.collected_value = 0
-                        self.add_debug_event('ghost', f"👻 {vehicle_id} posición inválida: {pos}", (255, 255, 0))
+                        self.add_debug_event('ghost', f"{vehicle_id} posición inválida: {pos}", (255, 255, 0))
                         continue
                     
                     row, col = pos
                     
-                    # Verificar que esté dentro de los límites del mapa
                     if not (0 <= row < self.map.rows and 0 <= col < self.map.cols):
                         vehicle.status = "destroyed"
                         vehicle.collected_value = 0
-                        self.add_debug_event('ghost', f"👻 {vehicle_id} fuera del mapa: {pos}", (255, 255, 0))
+                        self.add_debug_event('ghost', f"{vehicle_id} fuera del mapa: {pos}", (255, 255, 0))
                         continue
                     
-                    # Verificar que el vehículo realmente exista en esa posición del mapa
                     node = self.map.graph.get_node(row, col)
                     if node:
                         vehicle_found = False
                         
                         # Buscar el vehículo en el nodo
-                        # Puede estar en estado "vehicle" o en una base
                         if node.content:
                             vehicle_content = node.content
                             
-                            # Manejar listas de vehículos (mismo equipo en misma celda)
                             if isinstance(vehicle_content, list):
                                 for vehicle_data in vehicle_content:
                                     node_vehicle_id = None
@@ -796,19 +738,14 @@ class GameEngine:
                                 if node_vehicle_id == vehicle_id:
                                     vehicle_found = True
                         
-                        # Si el vehículo no está en el mapa pero dice estar activo, marcarlo como destruido
-                        # PERO solo si no está en una posición de base (puede estar retornando)
                         if not vehicle_found:
-                            # Verificar si está en una posición de base
                             is_base_position = node.state in ("base_p1", "base_p2")
                             
-                            # Solo marcar como fantasma si no está en una base
-                            # (puede estar retornando y acaba de llegar a la base)
                             if not is_base_position:
                                 vehicle.status = "destroyed"
                                 vehicle.collected_value = 0
                                 node_state = node.state if node else "None"
-                                self.add_debug_event('ghost', f"👻 {vehicle_id} fantasma en {pos} (nodo: {node_state})", (255, 255, 0))
+                                self.add_debug_event('ghost', f"{vehicle_id} fantasma en {pos} (nodo: {node_state})", (255, 255, 0))
 
     def _cleanup_destroyed_vehicles(self):
         """Limpia los vehículos destruidos del mapa"""
@@ -820,7 +757,6 @@ class GameEngine:
                     
                     # Manejar listas de vehículos (mismo equipo en misma celda)
                     if isinstance(vehicle_content, list):
-                        # Filtrar vehículos destruidos de la lista
                         vehicles_to_keep = []
                         for vehicle_data in vehicle_content:
                             vehicle_obj = None
@@ -836,13 +772,11 @@ class GameEngine:
                         
                         # Actualizar contenido del nodo
                         if vehicles_to_keep:
-                            # Si quedan vehículos vivos, mantener la lista (o convertir a single si es 1)
                             if len(vehicles_to_keep) == 1:
                                 node.content = vehicles_to_keep[0]
                             else:
                                 node.content = vehicles_to_keep
                         else:
-                            # Si no quedan vehículos vivos, limpiar el nodo
                             if node.state in ("base_p1", "base_p2"):
                                 node.state = node.state
                                 node.content = {}
@@ -850,7 +784,6 @@ class GameEngine:
                                 node.state = "empty"
                                 node.content = {}
                     else:
-                        # Manejar vehículo único
                         vehicle_obj = None
                         
                         if isinstance(vehicle_content, dict):
@@ -860,12 +793,10 @@ class GameEngine:
                         
                         if vehicle_obj and hasattr(vehicle_obj, "status"):
                             if vehicle_obj.status == "destroyed":
-                                # Debug: reportar vehículo destruido
                                 vehicle_id = getattr(vehicle_obj, "id", "unknown")
                                 
                                 # Limpiar el nodo
                                 if node.state in ("base_p1", "base_p2"):
-                                    # Restaurar estado de base sin vehículo
                                     node.state = node.state
                                     node.content = {}
                                 else:
@@ -878,7 +809,6 @@ class GameEngine:
             return
         
         try:
-            # Obtener información del ganador
             winner_name = self.game_over_info.get("winner", "Empate")
             if winner_name == "Jugador 1":
                 winner_name = "Jugador_1"
@@ -903,7 +833,6 @@ class GameEngine:
             self.persistence.record_player_stats("Jugador_2", p2_stats)
             
         except Exception as e:
-            # Silenciar errores de persistencia, no es crítico para el juego
             pass
     
     def _calculate_player_stats(self, player):

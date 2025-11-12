@@ -53,12 +53,10 @@ class Vehicle:
     must_return_on_cargo: bool = False
     trips_done_since_base: int = 0
     collected_value: int = 0
-    # Estado usado por las estrategias: ruta planificada y objetivo actual
     route: List[Tuple[int, int]] = field(default_factory=list)
     target: Optional[object] = None
-    # Posición específica en la base (donde sale y debe volver)
     base_position: Optional[Tuple[int, int]] = None
-    # Ruta de imagen del vehículo
+ 
     img_path: str = ""
 
     def move_to(self, row: int, col: int):
@@ -83,7 +81,6 @@ class Vehicle:
         elif vehicle_type == "auto":
             self.capacity = 4
         else:
-            # Fallback: restaurar a un valor por defecto si no se conoce el tipo
             self.capacity = 4
 
     def start_trip(self):
@@ -96,18 +93,16 @@ class Vehicle:
         """
         if picked_up:
             self.trips_done_since_base += 1
-            # Si se proporciona un valor (puntos) por lo recogido, lo acumulamos
             if value and value > 0:
                 self.collected_value += value
-                # Validación: si alcanza o supera la capacidad física del vehículo,
-                # forzamos que deba volver a la base y limitamos el valor al máximo.
+               
                 if self.collected_value >= self.capacity:
                     self.collected_value = self.capacity
                     self.status = "need_return"
-        # Si alcanza el máximo, forzamos volver a base
+      
         if self.trips_done_since_base >= self.max_consecutive_trips:
             self.status = "need_return"
-        # Si recogió cargo y debe volver, marcar
+      
         if picked_up == "cargo" and self.must_return_on_cargo:
             self.status = "need_return"
 
@@ -139,19 +134,9 @@ class Vehicle:
         if self.capacity <= 0:
             self.status = "need_return"
 
-        # no sobrepasar la capacidad física; si se alcanza, forzar regreso
-        # if self.capacity is not None and self.collected_value >= self.capacity:
-        #     self.collected_value = self.capacity
-        #     self.status = "need_return"
-
         # si se excede el máximo de viajes consecutivos, forzar regreso
         if self.trips_done_since_base >= self.max_consecutive_trips:
             self.status = "need_return"
-
-        # si recogió carga y debe volver en ese caso, marcarlo
-        # if item_type == "cargo" and self.must_return_on_cargo:
-        #     self.status = "need_return"
-
         return True
 
     def to_dict(self) -> Dict:
@@ -223,18 +208,14 @@ class VehicleManager:
         """Elimina un vehículo y actualiza todas las hash tables - O(1)"""
         if vehicle_id in self.vehicles:
             vehicle = self.vehicles[vehicle_id]
-            
-            # Eliminar de hash table principal
             del self.vehicles[vehicle_id]
-            
-            # Eliminar de hash table por tipo
+    
             if vehicle.type in self.vehicles_by_type:
                 try:
                     self.vehicles_by_type[vehicle.type].remove(vehicle.id)
                 except ValueError:
                     pass
             
-            # Eliminar de hash table por estado
             if vehicle.status in self.vehicles_by_status:
                 self.vehicles_by_status[vehicle.status].discard(vehicle.id)
     
@@ -246,14 +227,11 @@ class VehicleManager:
         
         old_status = vehicle.status
         
-        # Eliminar del conjunto de estado antiguo
         if old_status in self.vehicles_by_status:
             self.vehicles_by_status[old_status].discard(vehicle_id)
         
-        # Actualizar estado del vehículo
         vehicle.status = new_status
-        
-        # Agregar al conjunto de nuevo estado
+      
         if new_status not in self.vehicles_by_status:
             self.vehicles_by_status[new_status] = set()
         self.vehicles_by_status[new_status].add(vehicle_id)
@@ -337,7 +315,7 @@ class VehicleManager:
                 capacity=1,
                 allowed_load=["people"],
                 max_consecutive_trips=1,
-                must_return_on_cargo=True,  # irrelevant pero mantener coherencia
+                must_return_on_cargo=True,
                 img_path=vehicle_images["moto"],
             )
             self.add_vehicle(v)
