@@ -11,9 +11,6 @@ Responsabilidades:
 - Proveer funciones de acceso y modificación de estado.
 - Servir como base de los algoritmos de búsqueda (pathfinding).
 """
-
-
-
 #clase responsable de crear el grafo que va a representar el mapa 2d del simulador, usando la clase node
 from src.node import Node
 from src.mines_manager import MineManager
