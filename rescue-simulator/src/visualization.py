@@ -64,18 +64,13 @@ class Visualization:
         self.init_button = Button(str(assets_path / 'initBtn.png'), 'bottom', (-220,0), partial(self.engine.init_game))
         
         self.play_button = Button(str(assets_path / 'playBtn.png'), 'bottom', (-50,0), partial(self.engine.start_game))
-        self.backward_button = Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (80,0), partial(self.engine.step_backward))
-        self.forward_button = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (170,0), partial(self.engine.step_forward))
-        self.stop_button = Button(str(assets_path / 'stopBtn.png'), 'bottom', (270,0), partial(self.engine.stop_game))
+        self.forward_button = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (80,0), partial(self.engine.step_forward))
+        self.stop_button = Button(str(assets_path / 'stopBtn.png'), 'bottom', (170,0), partial(self.engine.stop_game))
         
         # Posiciones alternativas (centradas) cuando INIT no está visible
         self.play_button_centered = Button(str(assets_path / 'playBtn.png'), 'bottom', (-135,0), partial(self.engine.start_game))
-        self.backward_button_centered = Button(str(assets_path / 'backwardsBtn.png'), 'bottom', (-5,0), partial(self.engine.step_backward))
-        self.forward_button_centered = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (85,0), partial(self.engine.step_forward))
-        self.stop_button_centered = Button(str(assets_path / 'stopBtn.png'), 'bottom', (185,0), partial(self.engine.stop_game))
-        
-        # Botón save siempre en la misma posición
-        self.save_button = Button(str(assets_path / 'saveBtn.png'), 'bottomLeft', (40,0), """partial(self.engine.save_game)""")
+        self.forward_button_centered = Button(str(assets_path / 'forwardsBtn.png'), 'bottom', (-5,0), partial(self.engine.step_forward))
+        self.stop_button_centered = Button(str(assets_path / 'stopBtn.png'), 'bottom', (85,0), partial(self.engine.stop_game))
         
         self.exit_button = TextButton('X', 'topRight', (-40, 0), exit, font_size=32, color=(255, 80, 80), hover_color=(255, 120, 120))
         
@@ -92,17 +87,19 @@ class Visualization:
             if show_init:
                 self.init_button.handle_event(event)
                 self.play_button.handle_event(event)
-                self.backward_button.handle_event(event)
                 self.forward_button.handle_event(event)
                 self.stop_button.handle_event(event)
             else:
                 self.play_button_centered.handle_event(event)
-                self.backward_button_centered.handle_event(event)
                 self.forward_button_centered.handle_event(event)
                 self.stop_button_centered.handle_event(event)
             
+<<<<<<< HEAD
             self.save_button.handle_event(event)
             
+=======
+            # Botón de salida siempre disponible
+>>>>>>> reestructuracion
             self.exit_button.handle_event(event)
 
     def render(self):
@@ -122,16 +119,17 @@ class Visualization:
             if show_init:
                 self.init_button.draw(self.screen)
                 self.play_button.draw(self.screen)
-                self.backward_button.draw(self.screen)
                 self.forward_button.draw(self.screen)
                 self.stop_button.draw(self.screen)
             else:
                 self.play_button_centered.draw(self.screen)
-                self.backward_button_centered.draw(self.screen)
                 self.forward_button_centered.draw(self.screen)
                 self.stop_button_centered.draw(self.screen)
+<<<<<<< HEAD
             
             self.save_button.draw(self.screen)
+=======
+>>>>>>> reestructuracion
         
         self.exit_button.draw(self.screen)
         
@@ -263,6 +261,7 @@ class Visualization:
                 pygame.draw.circle(temp_surface, color_with_alpha, (radius, radius), radius)
                 self.screen.blit(temp_surface, (center_x - radius, center_y - radius))
 
+<<<<<<< HEAD
     def drawDebugPanel(self):
         """Dibuja el panel de debug con eventos de colisiones y destrucciones"""
         try:
@@ -332,6 +331,8 @@ class Visualization:
         except:
             pass 
 
+=======
+>>>>>>> reestructuracion
     def drawGameOverScreen(self):
         """Dibuja la pantalla de fin de juego:
         - EMPATE: muestra ambos jugadores lado a lado.
@@ -453,10 +454,8 @@ class Visualization:
 
         self.init_button.draw(self.screen)
         self.play_button.draw(self.screen)
-        self.backward_button.draw(self.screen)
         self.forward_button.draw(self.screen)
         self.stop_button.draw(self.screen)
-        self.save_button.draw(self.screen)
         self.exit_button.draw(self.screen)
     
     def _draw_player_stats(self, player_info, x, y, width, info_font, small_font, color):

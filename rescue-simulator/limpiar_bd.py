@@ -12,6 +12,22 @@ from pathlib import Path
 import sqlite3
 from persistence import PersistenceManager
 
+def find_database():
+    """Busca la base de datos en múltiples ubicaciones posibles"""
+    script_dir = Path(__file__).resolve().parent
+    possible_paths = [
+        script_dir / "data" / "simulation_history.db",  # Si se ejecuta desde rescue-simulator/
+        script_dir.parent / "rescue-simulator" / "data" / "simulation_history.db",  # Si se ejecuta desde el proyecto raíz
+        Path("data/simulation_history.db"),  # Ruta relativa actual
+        Path("rescue-simulator/data/simulation_history.db"),  # Desde proyecto raíz
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return path
+    
+    return None
+
 def main():
     """Función principal"""
     
@@ -19,12 +35,14 @@ def main():
     print("  LIMPIEZA Y REINICIO DEL SISTEMA DE PERSISTENCIA")
     print("=" * 70)
     
-    # Verificar que existe la base de datos
-    db_path = Path("data/simulation_history.db")
-    if not db_path.exists():
+    # Buscar la base de datos en múltiples ubicaciones
+    db_path = find_database()
+    if db_path is None:
         print("\nℹ️  La base de datos no existe aún")
         print("   No hay nada que limpiar.")
         return
+    
+    print(f"\n📁 Base de datos encontrada: {db_path}")
     
     # Mostrar estadísticas antes
     print("\n📊 ESTADO ACTUAL:")
@@ -34,9 +52,6 @@ def main():
         summary = pm.get_statistics_summary()
         print(f"  Simulaciones totales: {summary.get('total_simulations', 0)}")
         print(f"  Simulaciones completadas: {summary.get('completed_simulations', 0)}")
-        
-        storage_info = pm.get_storage_info()
-        print(f"  Espacio usado: {storage_info['total_formatted']}")
     except Exception as e:
         print(f"  ⚠️  Error al leer estadísticas: {e}")
     
@@ -46,11 +61,8 @@ def main():
     print("=" * 70)
     print("\nEsto eliminará:")
     print("  ✓ Todas las simulaciones de la base de datos")
-    print("  ✓ Todos los estados guardados (snapshots, checkpoints)")
-    print("  ✓ Todos los guardados manuales")
     print("\nNO se eliminarán:")
     print("  ✓ Configuraciones guardadas (config/saved_configs/)")
-    print("  ✓ Archivos CSV exportados (exports/)")
     
     print("\n" + "-" * 70)
     confirmacion = input("¿Continuar? Escribe 'SI' (en mayúsculas) para confirmar: ").strip()
@@ -91,24 +103,8 @@ def main():
         print(f"   ✅ Eliminadas {total_stats} estadísticas de jugadores")
         print(f"   ✅ Eliminadas {total_vehicles} estadísticas de vehículos")
         
-        # 2. Limpiar estados guardados
-        print("\n2️⃣  Eliminando estados guardados...")
-        
-        # Obtener información antes
-        info_before = pm.get_storage_info()
-        snapshots_before = info_before['snapshots_bytes']
-        manual_before = info_before['manual_saves_bytes']
-        checkpoints_before = info_before['checkpoints_bytes']
-        
-        # Limpiar estados
-        pm.state_manager.clear_all_states(confirm=True)
-        
-        print(f"   ✅ Snapshots eliminados ({info_before['snapshots_formatted']})")
-        print(f"   ✅ Guardados manuales eliminados ({info_before['manual_saves_formatted']})")
-        print(f"   ✅ Checkpoints eliminados ({info_before['checkpoints_formatted']})")
-        
-        # 3. Verificar resultado
-        print("\n3️⃣  Verificando resultado...")
+        # 2. Verificar resultado
+        print("\n2️⃣  Verificando resultado...")
         
         # Verificar base de datos
         conn = sqlite3.connect(str(db_path))
@@ -121,13 +117,6 @@ def main():
             print("   ✅ Base de datos limpiada correctamente")
         else:
             print(f"   ⚠️  Quedan {remaining} simulaciones (puede ser normal)")
-        
-        # Verificar estados
-        info_after = pm.get_storage_info()
-        if info_after['total_bytes'] == 0:
-            print("   ✅ Estados guardados eliminados correctamente")
-        else:
-            print(f"   ⚠️  Quedan {info_after['total_formatted']} de estados")
         
         print("\n" + "=" * 70)
         print("  ✅ LIMPIEZA COMPLETA EXITOSA")

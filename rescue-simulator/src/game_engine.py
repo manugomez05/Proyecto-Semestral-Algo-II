@@ -16,7 +16,6 @@ from config.strategies.player1_strategies import Strategy1
 import sys
 import importlib.util
 import os
-import pickle
 import time
 from pathlib import Path
 
@@ -44,7 +43,6 @@ class GameEngine:
         self.start_time = time.time()  # Tiempo de inicio para minas basadas en tiempo
         # Directorio raíz del proyecto (rescue-simulator)
         self._project_root = Path(__file__).resolve().parents[1]
-        self._saved_states_dir = self._project_root / 'saved_states'
         
         # Sistema de persistencia
         if PersistenceManager is not None:
@@ -55,10 +53,15 @@ class GameEngine:
         else:
             self.persistence = None
         
+<<<<<<< HEAD
         self.debug_events = []
         self.max_debug_events = 15 
         
         self.game_over_info = None 
+=======
+        # Estado del juego terminado
+        self.game_over_info = None  # Información del ganador
+>>>>>>> reestructuracion
         
         # Sistema de animaciones de colisiones
         self.collision_animations = [] 
@@ -69,6 +72,7 @@ class GameEngine:
         self.player1 = Player("Jugador_1", base_positions["player1"])
         self.player2 = Player("Jugador_2", base_positions["player2"])
 
+<<<<<<< HEAD
         
 
     def add_debug_event(self, event_type, message, color=(255, 255, 255)):
@@ -85,6 +89,8 @@ class GameEngine:
         if len(self.debug_events) > self.max_debug_events:
             self.debug_events.pop(0)
     
+=======
+>>>>>>> reestructuracion
     def add_collision_animation(self, position, animation_type="vehicle"):
         """Agrega una animación de colisión en la posición especificada
         
@@ -115,11 +121,19 @@ class GameEngine:
     
     def init_game(self):
         self.map.clear_map()
+<<<<<<< HEAD
         self.debug_events = []  
         self.collision_animations = []  
         self.tick = 0  
         self.start_time = time.time() 
         self.game_over_info = None 
+=======
+        self.collision_animations = []  # Limpiar animaciones al iniciar nuevo juego
+        self.tick = 0  # Resetear tick a 0
+        self.start_time = time.time()  # Resetear tiempo de inicio
+        self.game_over_info = None  # Resetear información de game over
+        # Variables de timeout para detectar juegos estancados
+>>>>>>> reestructuracion
         self._last_score_change_tick = 0
         self._last_total_score = 0
         
@@ -130,6 +144,7 @@ class GameEngine:
         self.player1.vehicles = self.player1._create_fleet()
         self.player2.vehicles = self.player2._create_fleet()
         
+<<<<<<< HEAD
         try:
             if self._saved_states_dir.exists():
                 import shutil
@@ -137,6 +152,8 @@ class GameEngine:
         except Exception:
             pass 
         
+=======
+>>>>>>> reestructuracion
         resources = self.map.generate_random_map()
 
         self.player1.resources = resources
@@ -168,9 +185,6 @@ class GameEngine:
                 pass
 
         self.state = "init"
-        
-        # Mensaje de debug
-        self.add_debug_event('system', "🎮 Juego inicializado - Tick reseteado a 0", (100, 255, 100))
     
     def _initialize_vehicles_at_base(self):
         """
@@ -228,6 +242,7 @@ class GameEngine:
 
     def start_game(self):
         self.state = "running"
+<<<<<<< HEAD
         self.start_time = time.time()
         self.add_debug_event('system', "▶️ Simulación iniciada", (100, 255, 100))
 
@@ -354,6 +369,17 @@ class GameEngine:
 
         if not found:
             self.add_debug_event('system', "No hay estados guardados", (255, 100, 100))
+=======
+        self.start_time = time.time()  # Reiniciar tiempo al iniciar
+
+    def stop_game(self):
+        self.state = "stopped"
+
+    def step_forward(self):
+        """Avanza un paso en la simulación"""
+        # Ejecutar un único tick aunque el motor esté en pausa
+        self.update(force=True)
+>>>>>>> reestructuracion
     
     def _check_game_over_conditions(self):
         """Verifica si se cumplen las condiciones de fin de juego"""
@@ -382,7 +408,10 @@ class GameEngine:
         
         # El juego termina por falta de vehículos si ambos equipos no tienen vehículos activos
         if p1_active_vehicles == 0 and p2_active_vehicles == 0:
+<<<<<<< HEAD
             self.add_debug_event('system', "Fin del juego: No hay más vehículos", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
             return True, "Todos los vehículos han sido destruidos"
         
         # Contar vehículos en estado "job_done" (terminaron su trabajo)
@@ -395,17 +424,26 @@ class GameEngine:
         if p1_active_vehicles > 0 and p2_active_vehicles > 0:
             # Ambos jugadores tienen vehículos activos
             if p1_job_done == p1_active_vehicles and p2_job_done == p2_active_vehicles:
+<<<<<<< HEAD
                 self.add_debug_event('system', "Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
                 return True, "Todos los vehículos han completado su trabajo"
         elif p1_active_vehicles > 0:
             # Solo jugador 1 tiene vehículos activos
             if p1_job_done == p1_active_vehicles:
+<<<<<<< HEAD
                 self.add_debug_event('system', "Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
                 return True, "Todos los vehículos han completado su trabajo"
         elif p2_active_vehicles > 0:
             # Solo jugador 2 tiene vehículos activos
             if p2_job_done == p2_active_vehicles:
+<<<<<<< HEAD
                 self.add_debug_event('system', "Fin del juego: Todos los vehículos completaron su trabajo", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
                 return True, "Todos los vehículos han completado su trabajo"
         
         # El juego termina por falta de recursos solo si:
@@ -417,7 +455,10 @@ class GameEngine:
             vehicles_with_resources = p1_vehicles_with_resources + p2_vehicles_with_resources
             
             if vehicles_outside == 0 and vehicles_with_resources == 0:
+<<<<<<< HEAD
                 self.add_debug_event('system', "Fin del juego: No quedan recursos ni vehículos en misión", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
                 return True, "No quedan recursos y todos los vehículos han retornado"
             else:
                 # Hay recursos sin entregar, esperar a que los vehículos regresen
@@ -436,6 +477,7 @@ class GameEngine:
         
         ticks_without_progress = self.tick - self._last_score_change_tick
         
+<<<<<<< HEAD
         if ticks_without_progress == 200 and resources_remaining > 0:
             self.add_debug_event('system', f"Sin progreso: {resources_remaining} recursos sin recoger", (255, 200, 0))
         elif ticks_without_progress == 350 and resources_remaining > 0:
@@ -445,6 +487,9 @@ class GameEngine:
         
         if ticks_without_progress > 500 and resources_remaining > 0:
             self.add_debug_event('system', "Timeout: Sin progreso en 500 ticks", (255, 200, 0))
+=======
+        if ticks_without_progress > 500 and resources_remaining > 0:
+>>>>>>> reestructuracion
             return True, f"Juego detenido por inactividad (quedan {resources_remaining} recursos)"
         
         return False, None
@@ -516,11 +561,14 @@ class GameEngine:
             
         if self.state != "running" and not force:
             return
+<<<<<<< HEAD
         
         # Guardar el estado actual antes de avanzar (para poder retroceder)
         should_save = force or (self.state == "running" and self.tick % 5 == 0)
         if should_save:
             self.save_state()
+=======
+>>>>>>> reestructuracion
 
         self.tick += 1
         self.map.current_tick = self.tick
@@ -593,10 +641,13 @@ class GameEngine:
                         
                         if vehicle_obj and hasattr(vehicle_obj, "status") and vehicle_obj.status != "destroyed":
                             if self.map.mine_manager.isCellMined((row, col), self.tick):
-                                vehicle_id = getattr(vehicle_obj, "id", "unknown")
                                 vehicle_obj.status = "destroyed"
                                 vehicle_obj.collected_value = 0
+<<<<<<< HEAD
                                 self.add_debug_event('mine', f" {vehicle_id} destruido por mina en {(row, col)}", (255, 100, 0))
+=======
+                                # Agregar animación de colisión con mina
+>>>>>>> reestructuracion
                                 self.add_collision_animation((row, col), animation_type="mine")
 
     def _check_vehicle_collisions(self):
@@ -645,12 +696,15 @@ class GameEngine:
                         vehicle2.collected_value = 0
                         vehicles2_ids.append(vehicle2.id)
                 
-                # Evento de debug solo si hubo destrucción
+                # Agregar animación de colisión entre vehículos
                 if vehicles1_ids or vehicles2_ids:
+<<<<<<< HEAD
                     v1_str = ", ".join(vehicles1_ids) if vehicles1_ids else "ninguno"
                     v2_str = ", ".join(vehicles2_ids) if vehicles2_ids else "ninguno"
                     self.add_debug_event('collision', f"COLISIÓN en {pos}: P1[{v1_str}] vs P2[{v2_str}]", (255, 50, 50))
                     # Agregar animación de colisión entre vehículos
+=======
+>>>>>>> reestructuracion
                     self.add_collision_animation(pos, animation_type="vehicle")
     
     def _check_same_team_collisions(self):
@@ -665,12 +719,15 @@ class GameEngine:
                         player1_positions[pos] = []
                     player1_positions[pos].append(vehicle)
         
+<<<<<<< HEAD
         # Reportar colisiones en equipo 1 (más de 1 vehículo en la misma posición)
         for pos, vehicles in player1_positions.items():
             if len(vehicles) > 1:
                 vehicle_ids = [v.id for v in vehicles]
                 self.add_debug_event('same_team', f"Colisión mismo equipo P1 en {pos}: {', '.join(vehicle_ids)}", (255, 200, 0))
         
+=======
+>>>>>>> reestructuracion
         # Verificar colisiones dentro del equipo 2
         player2_positions = {}
         for vehicle_id, vehicle in self.player2.vehicles.items():
@@ -680,12 +737,15 @@ class GameEngine:
                     if pos not in player2_positions:
                         player2_positions[pos] = []
                     player2_positions[pos].append(vehicle)
+<<<<<<< HEAD
         
         # Reportar colisiones en equipo 2 (más de 1 vehículo en la misma posición)
         for pos, vehicles in player2_positions.items():
             if len(vehicles) > 1:
                 vehicle_ids = [v.id for v in vehicles]
                 self.add_debug_event('same_team', f"Colisión mismo equipo P2 en {pos}: {', '.join(vehicle_ids)}", (255, 200, 0))
+=======
+>>>>>>> reestructuracion
     
     def _check_vehicle_consistency(self):
         """Verifica que vehículos activos realmente existan en el mapa, marca como destruidos los 'fantasmas'"""
@@ -697,7 +757,10 @@ class GameEngine:
                     if not (isinstance(pos, tuple) and len(pos) == 2):
                         vehicle.status = "destroyed"
                         vehicle.collected_value = 0
+<<<<<<< HEAD
                         self.add_debug_event('ghost', f"{vehicle_id} posición inválida: {pos}", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
                         continue
                     
                     row, col = pos
@@ -705,7 +768,10 @@ class GameEngine:
                     if not (0 <= row < self.map.rows and 0 <= col < self.map.cols):
                         vehicle.status = "destroyed"
                         vehicle.collected_value = 0
+<<<<<<< HEAD
                         self.add_debug_event('ghost', f"{vehicle_id} fuera del mapa: {pos}", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
                         continue
                     
                     node = self.map.graph.get_node(row, col)
@@ -744,8 +810,11 @@ class GameEngine:
                             if not is_base_position:
                                 vehicle.status = "destroyed"
                                 vehicle.collected_value = 0
+<<<<<<< HEAD
                                 node_state = node.state if node else "None"
                                 self.add_debug_event('ghost', f"{vehicle_id} fantasma en {pos} (nodo: {node_state})", (255, 255, 0))
+=======
+>>>>>>> reestructuracion
 
     def _cleanup_destroyed_vehicles(self):
         """Limpia los vehículos destruidos del mapa"""
@@ -793,8 +862,11 @@ class GameEngine:
                         
                         if vehicle_obj and hasattr(vehicle_obj, "status"):
                             if vehicle_obj.status == "destroyed":
+<<<<<<< HEAD
                                 vehicle_id = getattr(vehicle_obj, "id", "unknown")
                                 
+=======
+>>>>>>> reestructuracion
                                 # Limpiar el nodo
                                 if node.state in ("base_p1", "base_p2"):
                                     node.state = node.state
