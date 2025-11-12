@@ -300,8 +300,7 @@ class ConfigManager:
             },
             "simulation": {
                 "max_ticks": 10000,
-                "auto_save_interval": 5,
-                "enable_debug": True
+                "auto_save_interval": 5
             },
             "players": {
                 "player1": {

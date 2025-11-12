@@ -34,8 +34,5 @@ def main():
         view.render()
         pygame.time.Clock().tick(FPS)
 
-        #print(pygame.mouse.get_pos())
-    
-
 if __name__ == "__main__":
     main()

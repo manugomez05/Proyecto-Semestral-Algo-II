@@ -282,7 +282,6 @@ class MineManager:
                                     # Verificar si esta celda tiene un recurso
                                     node = map_manager.graph.get_node(check_row, check_col)
                                     if node.state == 'occupied' and node.content:
-                                        #print(f"DEBUG: Posición ({new_row}, {new_col}) no es segura - hay recurso en ({check_row}, {check_col})")
                                         safe_position = False
                                         break
                         if not safe_position:
@@ -300,8 +299,6 @@ class MineManager:
                     
                     # Actualizar cache espacial con la nueva posición
                     self._update_spatial_cache_for_mine(mine, rows, cols)
-                    
-                    #print(f"DEBUG: G1 movida de {old_pos} a {mine.center}")
                     break
 
     def addRandomMine(self, type: MineType, rows: int, cols: int, margin: int = 0, max_attempts: int = 100, map_graph: "MapGraph" = None) -> Mine:
