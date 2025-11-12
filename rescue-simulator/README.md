@@ -1,3 +1,4 @@
+#Rama principal - Reestructuracion
 # Rescue Simulator - Guía de Instalación y Uso
 
 ## Prerequisitos
